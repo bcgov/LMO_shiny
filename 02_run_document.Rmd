@@ -1,0 +1,333 @@
+---
+title: "`r params$doc_title`"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+runtime: shiny
+css: style.css
+params:
+  doc_title: "2022 British Columbia Labour Market Outlook"
+---
+
+```{r}
+library(tidyverse)
+library(shinyWidgets)
+library(plotly)
+library(kableExtra)
+current_year <- 2022
+occupation_outlook <- vroom::vroom(here::here("shiny_data","occupation_outlook.csv"))
+highlights_tab <- vroom::vroom(here::here("shiny_data","highlights_tab.csv"))
+
+page_titles <- c("Landing Page",
+                 "Highlights Part 1",
+                 "Annual Outlook",
+                 "Regional Outlook",
+                 "Industry Outlook",
+                 "Occupational Outlook",
+                 "Industry Outlook Data Table",
+                 "Occupational Outlook Data Table",
+                 "High Opportunity Occupations",
+                 "Job Openings 500 Occupations",
+                 "Sources of New Supply",
+                 "Labour Market Definitions")
+
+
+nav_but <- function(direction, current_page){
+    if(direction=="previous"){
+      if(current_page==1){
+        name = tail(page_titles, n=1)
+      }else{
+        name = page_titles[current_page-1]
+      }
+    }
+  if(direction == "next"){
+      if(current_page == length(page_titles)){
+        name = page_titles[1]
+      }else{
+        name = page_titles[current_page+1]
+      }
+    }
+  name <- str_to_lower(name)%>%
+      str_replace_all(" ","-")
+  lab <-  str_to_title(paste(direction, "Page"))
+  oc <- paste0("location.href='#section-",name,"';")
+  actionButton("1", label = lab, class = "btn btn-sm btn-primary", 
+            onclick = oc)
+}
+
+```
+
+`r page_titles[1]` {data-navmenu="Table of Contents"}
+=====================================
+Inputs {.sidebar}
+-------------------------------------
+```{r}
+nav_but(direction = "previous", current_page = 1)
+nav_but(direction = "next", current_page = 1)
+```
+
+Row {data-height=500}
+-------------------------------------
+
+```{r, out.width = "125%"}
+knitr::include_graphics("aest.png")#the cover image
+```
+
+Row {data-height=500}
+-------------------------------------
+
+<h1 class="center">`r params$doc_title`.</h1> <!-- add the title -->
+
+`r page_titles[2]`  {data-navmenu="Table of Contents"}
+===========================================
+Inputs {.sidebar}
+-------------------------------------
+```{r}
+nav_but(direction = "previous", current_page = 2)
+nav_but(direction = "next", current_page = 2)
+
+```
+
+Row {data-height=200}
+-------------------------------------
+
+### Labour Market Outlook Highlights | `r paste(current_year, current_year+10, sep="-")`
+<h3 class="center">What is the Labour Market Outlook?</h3>
+
+The B.C. Labour Market Outlook is a 10-year forecast of the expected flow of supply and demand for labour in the province. It is revised every year with the most up-to-date information available. The purpose is to provide British Columbians with the knowledge required to make informed decisions on careers, hiring, training and education.
+
+
+Row {data-height=800}
+-------------------------------------
+   
+###     
+<br>
+```{r}
+tbbl <- highlights_tab %>%
+  kbl(format.args = list(big.mark = ",")) %>%
+  kable_styling()%>%
+  row_spec(c(1,4,9), bold = TRUE, background = "#e0e0e0")
+gsub("<thead>.*</thead>", "", tbbl)
+```   
+
+###     
+
+```{r, fig.retina=2}
+pie <- readxl::read_excel(here::here("raw_data","Education 2022E.xlsx"))
+ct <- paste(scales::comma(round(sum(pie$Openings),-3)),"Job Openings \n Expected in B.C")
+aest::aest_donut(pie, Openings, group_var = `Type of Education`, center_text = ct, center_text_size = 2.5, lab_size=2.5)
+```
+
+`r page_titles[3]`  {data-navmenu="Table of Contents"}
+===========================================
+Inputs {.sidebar}
+-------------------------------------
+```{r}
+nav_but(direction = "previous", current_page = 3)
+nav_but(direction = "next", current_page = 3)
+
+```
+
+Column
+-------------------------------------
+### `r page_titles[3]`
+
+`r page_titles[4]`  {data-navmenu="Table of Contents"}
+=========================================
+Inputs {.sidebar}
+-------------------------------------
+```{r}
+nav_but(direction = "previous", current_page = 4)
+nav_but(direction = "next", current_page = 4)
+
+```
+
+Column
+-------------------------------------
+### `r page_titles[4]`
+
+`r page_titles[5]` {data-navmenu="Table of Contents"}
+=========================================
+Inputs {.sidebar}
+-------------------------------------
+```{r}
+nav_but(direction = "previous", current_page = 5)
+nav_but(direction = "next", current_page = 5)
+
+```
+
+Column
+-------------------------------------
+### `r page_titles[5]`
+
+`r page_titles[6]`  {data-navmenu="Table of Contents"}
+========================================
+Inputs {.sidebar}
+-------------------------------------
+
+### Navigation
+
+```{r}
+nav_but(direction = "previous", current_page = 6)
+nav_but(direction = "next", current_page = 6)
+```
+
+### Inputs
+
+```{r}
+selectizeGroupUI(
+        id = "my-filters",
+        inline = FALSE,
+        params = list(
+          var_one = list(inputId = "name", title = "Choose a Variable", placeholder = "select"),
+          var_two = list(inputId = "Geographic_Area", title = "Choose a Geographic Area", placeholder = "select"),
+          var_three = list(inputId = "NOC1", title = "Choose a NOC1", placeholder = "select"),
+          var_four = list(inputId = "NOC2", title = "Choose a NOC2", placeholder = "select"),
+          var_five = list(inputId = "NOC3", title = "Choose a NOC3", placeholder = "select")
+        )
+      )
+
+res_mod <- callModule(
+    module = selectizeGroupServer,
+    id = "my-filters",
+    data = occupation_outlook,
+    vars = c(
+      "name",
+      "Geographic_Area",
+      "NOC1",
+      "NOC2",
+      "NOC3"
+    )
+)
+
+noc_agg <- reactive({
+  case_when(is.null(input[["my-filters-NOC1"]]) & 
+           is.null(input[["my-filters-NOC2"]]) &
+           is.null(input[["my-filters-NOC3"]]) ~ "NOC1",
+           is.null(input[["my-filters-NOC2"]]) & 
+           is.null(input[["my-filters-NOC3"]]) ~ "NOC2",
+           is.null(input[["my-filters-NOC3"]]) ~ "NOC3",
+           TRUE~"NOC4")
+})
+
+tbbl <- reactive({
+  res_mod()%>%
+    distinct(Geographic_Area, name, get(noc_agg()), .keep_all = TRUE)%>%
+    select(Geographic_Area, name, value, noc="get(noc_agg())")%>%
+    na.omit()
+})
+
+
+```
+
+Column
+-------------------------------------------
+
+### `r page_titles[6]` 
+
+```{r fig.retina=2}
+renderPlotly({
+  plt <- tbbl()%>%
+    ggplot(aes(value,
+               fct_reorder(noc, value, .fun = max),
+               fill= fct_reorder(Geographic_Area, value, .fun = max),
+               text= paste0(
+                "Geographic Area: ", Geographic_Area, "\n",
+                "NOC: ", noc, "\n",
+                "Value: ", scales::comma(value, accuracy = .01))
+               ))+
+    geom_col(position = "dodge2")+
+    scale_x_continuous(labels = scales::comma)+
+    scale_fill_viridis_d()+
+    facet_wrap(vars(name), scales = "free_x")+
+    labs(x="",y="")+
+    guides(fill = guide_legend(reverse=TRUE))+
+    theme_minimal()+
+    theme(axis.text.x = element_text(angle = 15))
+  ggplotly(plt, tooltip="text")%>%
+    config(displayModeBar = F)
+})
+```
+
+`r page_titles[7]`  {data-navmenu="Table of Contents"}
+========================================
+Inputs {.sidebar}
+-------------------------------------
+```{r}
+nav_but(direction = "previous", current_page = 7)
+nav_but(direction = "next", current_page = 7)
+```
+
+Column
+-------------------------------------
+### `r page_titles[7]`
+
+`r page_titles[8]` {data-navmenu="Table of Contents"}
+========================================
+Inputs {.sidebar}
+-------------------------------------
+```{r}
+nav_but(direction = "previous", current_page = 8)
+nav_but(direction = "next", current_page = 8)
+
+```
+
+Column
+-------------------------------------
+### `r page_titles[8]`
+
+`r page_titles[9]` {data-navmenu="Table of Contents"}
+========================================
+Inputs {.sidebar}
+-------------------------------------
+```{r}
+nav_but(direction = "previous", current_page = 9)
+nav_but(direction = "next", current_page = 9)
+```
+
+Column
+-------------------------------------
+### `r page_titles[9]`
+
+`r page_titles[10]`  {data-navmenu="Table of Contents"}
+========================================
+Inputs {.sidebar}
+-------------------------------------
+```{r}
+nav_but(direction = "previous", current_page = 10)
+nav_but(direction = "next", current_page = 10)
+```
+
+Column
+-------------------------------------
+### `r page_titles[10]`
+
+`r page_titles[11]`  {data-navmenu="Table of Contents"} 
+=========================================
+Inputs {.sidebar}
+-------------------------------------
+```{r}
+nav_but(direction = "previous", current_page = 11)
+nav_but(direction = "next", current_page = 11)
+```
+
+Column
+-------------------------------------
+### `r page_titles[11]` 
+
+`r page_titles[12]`  {data-navmenu="Table of Contents"}
+=========================================
+Inputs {.sidebar}
+-------------------------------------
+```{r}
+nav_but(direction = "previous", current_page = 12)
+nav_but(direction = "next", current_page = 12)
+```
+
+Column
+-------------------------------------
+### `r page_titles[12]` 
+
+
+
+
