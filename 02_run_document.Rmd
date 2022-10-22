@@ -127,7 +127,7 @@ Row {data-height=1000}
 tbbl <- ds_and_jo_tab %>%
   kbl(format.args = list(big.mark = ",")) %>%
   kable_styling()%>%
-  row_spec(c(1,4,9), bold = TRUE, background = "#e0e0e0")
+  row_spec(c(1,4), bold = TRUE, background = "#e0e0e0")
 gsub("<thead>.*</thead>", "", tbbl)
 ```   
 
@@ -292,8 +292,6 @@ table_tbbl <- reactive({
            name %in% table_vars)%>%
     camel_to_title()
 })
-
-
 ```
 
 Row 

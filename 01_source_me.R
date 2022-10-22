@@ -119,7 +119,7 @@ jo_total_noc <- jo_raw%>%
   filter(date>current_year)%>%
   filter(variable %in% c("job_openings", "expansion_demand","replacement_demand"))%>%
   pivot_wider(names_from = variable, values_from = value)%>%
-  mutate(decline_unemployment=round(job_openings*.0189, -3))%>% #WTF???
+#  mutate(decline_unemployment=round(job_openings*.0189, -3))%>% #WTF???
   select(-noc,-description)%>%
   pivot_longer(cols=-c(date, geographic_area))
 
@@ -145,7 +145,7 @@ ds_total_noc <- ds_raw%>%
 
 ds_and_jo <- bind_rows(jo_total_noc, ds_total_noc)%>%
   pivot_wider(names_from = name, values_from = value)%>%
-  mutate(additional_supply_requirement = job_openings - immigrants - migrants_from_other_provinces - young_people_starting_work- decline_unemployment,
+  mutate(additional_supply_requirement = job_openings - immigrants - migrants_from_other_provinces - young_people_starting_work,
          labour_force_exits = -1 * (deaths + retirements),
          total_supply_additions = young_people_starting_work+ immigrants + migrants_from_other_provinces+ additional_supply_requirement
   )%>%
@@ -173,7 +173,11 @@ jo_tab <- ds_and_jo%>%
   )
 
 ds_tab <- ds_and_jo%>%
-  filter(! name %in% c("job_openings","expansion_demand","replacement_demand"),
+  filter(name %in% c("total_supply_additions",
+                     "young_people_starting_work",
+                     "immigrants",
+                     "migrants_from_other_provinces",
+                     "additional_supply_requirement"),
          geographic_area=="british_columbia")%>%
   group_by(name)%>%
   summarize(value=round(sum(value), -3))%>%
@@ -207,7 +211,7 @@ emp_total_noc <- employment_raw%>%
 
 regional <- jo_total_noc%>%
   filter(name %in% c("expansion_demand", "job_openings", "replacement_demand"))%>%
-  group_by(geographic_area,name)%>%
+  group_by(geographic_area, name)%>%
   summarize(value=sum(value))%>%
   bind_rows(emp_total_noc)%>%
   bind_rows(aest::aest_bc_reg_pop())%>%
