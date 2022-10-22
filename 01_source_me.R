@@ -7,12 +7,29 @@ library("readxl")
 source(here::here("R","functions.R"))
 # "constants"... that change every year------------
 current_year <- 2022
-# process data for occupation outlook page--------
+
+#read in dataframes--------------
 jo_raw <- vroom::vroom(here("raw_data",
-                        list.files(here("raw_data"), pattern = "JO", ignore.case = TRUE)),
+                            list.files(here("raw_data"), pattern = "JO", ignore.case = TRUE)),
+                       locale = readr::locale(encoding = "latin1"),
+                       skip=3,
+                       col_select = -1)
+
+employment_raw <- vroom::vroom(here("raw_data",
+                                    list.files(here("raw_data"), pattern = "Emp")),
+                               locale = readr::locale(encoding = "latin1"),
+                               skip=3,
+                               col_select = -1)
+
+ds_raw <- vroom::vroom(here("raw_data",
+                        list.files(here("raw_data"), pattern = "DS")),
                    locale = readr::locale(encoding = "latin1"),
                    skip=3,
-                   col_select = -1)%>%
+                   col_select = -1)
+
+# occupation outlook--------
+
+jo_not_total_noc <-jo_raw%>%
   filter(Industry=="All industries",
          NOC!="#T")%>%
   select(-Industry)%>%
@@ -22,11 +39,7 @@ jo_raw <- vroom::vroom(here("raw_data",
   mutate(date=as.numeric(date))%>%
   clean_tbbl()
 
-employment_raw <- vroom::vroom(here("raw_data",
-                                list.files(here("raw_data"), pattern = "Emp")),
-                           locale = readr::locale(encoding = "latin1"),
-                           skip=3,
-                           col_select = -1)%>%
+emp_not_total_noc <- employment_raw%>%
   filter(Industry=="All industries",
          NOC!="#T")%>%
   select(-Industry)%>%
@@ -38,7 +51,7 @@ employment_raw <- vroom::vroom(here("raw_data",
 
 noc_mapping <- vroom::vroom(here::here("raw_data","noc_mapping.csv"))
 
-long <- bind_rows(jo_raw, employment_raw)%>%
+long <- bind_rows(jo_not_total_noc, emp_not_total_noc)%>%
   full_join(noc_mapping)
 
 two_to_one <- unique(noc_mapping[c("noc1","noc2")])
@@ -83,9 +96,7 @@ occupation_outlook <- bind_rows(noc1, noc2, noc3, noc4)%>%
          )%>%
   select(-data, -noc)%>%
   pivot_longer(cols=job_openings:replacement_demand, names_to = "name", values_to = "value")%>%
-  rapply(as.character, classes = "factor", how = "replace")%>%
-  tibble()%>%
-  mutate(across(where(is.character), make_title))%>%
+  camel_to_title()%>%
   rename(Geographic_Area=geographic_area,
          NOC1=noc1,
          NOC2=noc2,
@@ -94,65 +105,118 @@ occupation_outlook <- bind_rows(noc1, noc2, noc3, noc4)%>%
 
 write_csv(occupation_outlook, here::here("shiny_data","occupation_outlook.csv"))
 
-#highlights part 1---------------
-#table
-jo_tab <- jo_raw%>%
-  filter(geographic_area=="british_columbia",
-         date>current_year)%>%
-  group_by(variable)%>%
-  summarize(value=round(sum(value),-3))%>%
+#ds_and_jo----------------
+
+jo_total_noc <- jo_raw%>%
+  filter(Industry=="All industries",
+         NOC=="#T")%>%
+  select(-Industry)%>%
+  pivot_longer(cols=-c(NOC, Description, Variable, `Geographic Area`),
+               names_to = "date",
+               values_to = "value")%>%
+  mutate(date=as.numeric(date))%>%
+  clean_tbbl()%>%
+  filter(date>current_year)%>%
   filter(variable %in% c("job_openings", "expansion_demand","replacement_demand"))%>%
   pivot_wider(names_from = variable, values_from = value)%>%
-  mutate(decline_unemployment=round(job_openings*.0189, -3))#WTF???
+  mutate(decline_unemployment=round(job_openings*.0189, -3))%>% #WTF???
+  select(-noc,-description)%>%
+  pivot_longer(cols=-c(date, geographic_area))
 
-ds_tab <- vroom::vroom(here("raw_data",
-                        list.files(here("raw_data"), pattern = "DS")),
-                   locale = readr::locale(encoding = "latin1"),
-                   skip=3,
-                   col_select = -1)%>%
+ds_total_noc <- ds_raw%>%
   pivot_longer(cols=-c(NOC, Description, Industry, Variable, `Geographic Area`),
                names_to = "date",
                values_to = "value")%>%
   clean_tbbl()%>%
   mutate(date=as.numeric(as.character(date)))%>%
   filter(date>current_year,
-        noc=="#t",
-         geographic_area=="british_columbia",
-         variable %in% c("new_entrants",
+         noc=="#t",
+         variable %in% c("deaths",
+                         "retirements",
+                         "new_entrants",
                          "net_international_in-migration",
                          "net_interregional_in-migration"))%>%
-  group_by(variable)%>%
-  summarize(value=round(sum(value),-3))%>%
   pivot_wider(names_from = variable, values_from = value)%>%
   rename(young_people_starting_work=new_entrants,
          immigrants=`net_international_in-migration`,
-         migrants_from_other_provinces=`net_interregional_in-migration`)
+         migrants_from_other_provinces=`net_interregional_in-migration`)%>%
+  select(-noc, -description, -industry)%>%
+  pivot_longer(cols=-c(date,geographic_area))
 
-tab <- bind_cols(jo_tab, ds_tab)%>%
-    mutate(additional_supply_requirement = job_openings - immigrants - migrants_from_other_provinces - young_people_starting_work- decline_unemployment,
-           total_supply_additions = young_people_starting_work+ immigrants + migrants_from_other_provinces+ additional_supply_requirement
-           )%>%
-  pivot_longer(cols=everything())
+ds_and_jo <- bind_rows(jo_total_noc, ds_total_noc)%>%
+  pivot_wider(names_from = name, values_from = value)%>%
+  mutate(additional_supply_requirement = job_openings - immigrants - migrants_from_other_provinces - young_people_starting_work- decline_unemployment,
+         labour_force_exits = -1 * (deaths + retirements),
+         total_supply_additions = young_people_starting_work+ immigrants + migrants_from_other_provinces+ additional_supply_requirement
+  )%>%
+  pivot_longer(cols=-c(date, geographic_area))
 
-jo_tab <- tab%>%
-  filter(name %in% c("job_openings","expansion_demand","replacement_demand"))%>%
+ds_and_jo%>%
+  camel_to_title()%>%
+  write_csv(here::here("shiny_data","ds_and_jo.csv"))
+
+jo_total <- jo_total_noc%>%
+  filter(geographic_area=="british_columbia",
+         name=="job_openings",
+         date>current_year)%>%
+  summarize(value=round(sum(value),-3))%>%
+  pull(value)
+
+jo_tab <- ds_and_jo%>%
+  filter(name %in% c("job_openings","expansion_demand","replacement_demand"),
+         geographic_area=="british_columbia")%>%
+  group_by(name)%>%
+  summarize(value=round(sum(value), -3))%>%
   arrange(desc(value))%>%
   mutate(percent=scales::percent(2*value/sum(value)),
          name=str_to_title(str_replace_all(name,"_"," "))
-         )
+  )
 
-ds_tab <- tab%>%
-  filter(! name %in% c("job_openings","expansion_demand","replacement_demand"))%>%
+ds_tab <- ds_and_jo%>%
+  filter(! name %in% c("job_openings","expansion_demand","replacement_demand"),
+         geographic_area=="british_columbia")%>%
+  group_by(name)%>%
+  summarize(value=round(sum(value), -3))%>%
   arrange(desc(value))%>%
-  mutate(percent=scales::percent(value/pull(tab[tab$name=="job_openings", "value"]), accuracy = 1),
+  mutate(percent=scales::percent(value/jo_total, accuracy = 1),
          name=str_to_title(str_replace_all(name,"_"," "))
   )
 
 bind_rows(jo_tab, ds_tab)%>%
-  write_csv(here::here("shiny_data","highlights_tab.csv"))
-#pie
+  write_csv(here::here("shiny_data","ds_and_jo_tab.csv"))
 
-temp <- read_excel(here::here("raw_data","Education 2022E.xlsx"))
+#regional page------------
+
+emp_total_noc <- employment_raw%>%
+  filter(Industry=="All industries",
+         NOC=="#T")%>%
+  select(-Industry)%>%
+  pivot_longer(cols=-c(NOC, Description, Variable, `Geographic Area`),
+               names_to = "date",
+               values_to = "value")%>%
+  mutate(date=as.numeric(date))%>%
+  clean_tbbl()%>%
+  select(-noc,-description)%>%
+  group_by(geographic_area)%>%
+  nest()%>%
+  mutate(current_employment=map_dbl(data, get_current, "employment"),
+         employment_growth=map_dbl(data, get_cagr)
+         )%>%
+  select(-data)%>%
+  pivot_longer(cols=-geographic_area)
+
+regional <- jo_total_noc%>%
+  filter(name %in% c("expansion_demand", "job_openings", "replacement_demand"))%>%
+  group_by(geographic_area,name)%>%
+  summarize(value=sum(value))%>%
+  bind_rows(emp_total_noc)%>%
+  bind_rows(aest::aest_bc_reg_pop())%>%
+  pivot_wider()%>%
+  mutate(across(expansion_demand:current_employment, ~ .x/population, .names = "{.col}_per_capita"))%>%
+  select(-population)%>%
+  pivot_longer(cols=-geographic_area)
+
+write_csv(regional, here::here("shiny_data","regional.csv"))
 
 
 
