@@ -21,6 +21,7 @@ library(tidyverse)
 library(shinyWidgets)
 library(plotly)
 library(kableExtra)
+library(wrapR)
 source(here::here("R","functions.R"))
 current_year <- 2022
 occupation_outlook <- vroom::vroom(here::here("shiny_data","occupation_outlook.csv"))

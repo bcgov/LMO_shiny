@@ -1,13 +1,12 @@
+tictoc::tic()
 library("data.table")
 library("tidyverse")
 library("lubridate")
 library("here")
 library("readxl")
+library("wrapR")
 # Functions------------------
 source(here::here("R","functions.R"))
-# "constants"... that change every year------------
-current_year <- 2022
-
 #read in dataframes--------------
 jo_raw <- vroom::vroom(here("raw_data",
                             list.files(here("raw_data"), pattern = "JO", ignore.case = TRUE)),
@@ -27,6 +26,7 @@ ds_raw <- vroom::vroom(here("raw_data",
                    skip=3,
                    col_select = -1)
 
+
 # occupation outlook--------
 
 jo_not_total_noc <-jo_raw%>%
@@ -38,6 +38,8 @@ jo_not_total_noc <-jo_raw%>%
                values_to = "value")%>%
   mutate(date=as.numeric(date))%>%
   clean_tbbl()
+
+current_year <- min(jo_not_total_noc$date)
 
 emp_not_total_noc <- employment_raw%>%
   filter(Industry=="All industries",
@@ -221,6 +223,6 @@ regional <- jo_total_noc%>%
   pivot_longer(cols=-geographic_area)
 
 write_csv(regional, here::here("shiny_data","regional.csv"))
-
+tictoc::toc()
 
 
