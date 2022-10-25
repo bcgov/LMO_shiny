@@ -411,10 +411,20 @@ selectizeGroupUI(
         )
       )
 
+industry_outlook_plot <- industry_outlook%>%
+  filter(!name %in% c("First Five Cagr","Second Five Cagr", "Annual Replacement Rate"))%>%
+  pivot_wider()%>%
+  rename("Job Openings {current_year+1}-{current_year+10}" := `Job Openings`,
+        "Employment {current_year}" := `Employment Level`,
+        "Employment Growth {current_year+1}-{current_year+10}" := `Ten Year Cagr`,
+        "Expansion Demand {current_year+1}-{current_year+10}" := `Expansion Demand`,
+        "Replacement Demand {current_year+1}-{current_year+10}" := `Replacement Demand`)%>%
+  pivot_longer(cols=-c(Geographic_Area, aggregate_industry, industry)) #if want to reorder facets could do it here: mutate(name=factor(name, levels=....))
+
 industry_mod <- callModule(
     module = selectizeGroupServer,
     id = "industry_filters",
-    data = industry_outlook,
+    data = industry_outlook_plot,
     vars = c(
       "name",
       "Geographic_Area",
@@ -494,10 +504,20 @@ selectizeGroupUI(
         )
       )
 
+occupation_outlook_plot <- occupation_outlook%>%
+  filter(!name %in% c("First Five Cagr","Second Five Cagr", "Annual Replacement Rate"))%>%
+  pivot_wider()%>%
+  rename("Job Openings {current_year+1}-{current_year+10}" := `Job Openings`,
+        "Employment {current_year}" := `Employment Level`,
+        "Employment Growth {current_year+1}-{current_year+10}" := `Ten Year Cagr`,
+        "Expansion Demand {current_year+1}-{current_year+10}" := `Expansion Demand`,
+        "Replacement Demand {current_year+1}-{current_year+10}" := `Replacement Demand`)%>%
+  pivot_longer(cols=-c(Geographic_Area, NOC1, NOC2, NOC3, NOC4))
+
 occupation_mod <- callModule(
     module = selectizeGroupServer,
     id = "occupation_filters",
-    data = occupation_outlook,
+    data = occupation_outlook_plot,
     vars = c(
       "name",
       "Geographic_Area",

@@ -137,7 +137,7 @@ emp_total_noc <- employment_raw%>%
   group_by(geographic_area)%>%
   nest()%>%
   mutate(current_employment=map_dbl(data, get_current, "employment"),
-         employment_growth=map_dbl(data, get_cagr, "ten")
+         employment_growth=map_dbl(data, get_ten_cagr)
   )%>%
   select(-data)%>%
   pivot_longer(cols=-geographic_area)
