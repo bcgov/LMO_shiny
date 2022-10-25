@@ -173,7 +173,7 @@ col_data <- reactive({
 })
 pie_data <- reactive({
   col_data()%>%
-  group_by(name)%>%annual_employment_growth
+  group_by(name)%>%
   summarise(value=round(sum(value),-3))
 })
 ct_reactive <- reactive({
