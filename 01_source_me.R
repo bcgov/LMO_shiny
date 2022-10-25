@@ -26,6 +26,10 @@ ds_raw <- vroom::vroom(here("raw_data",
                    skip=3,
                    col_select = -1)
 
+typical_education <- read_excel(here::here("raw_data","Occupational Characteristics based on LMO 2022E 2022-Aug.xlsx"), skip=3, sheet = "Characteristics")%>%
+  janitor::clean_names()%>%
+  select(noc=noc_2016, Typical_Education=typical_education_background_2022_editon)
+
 # we need current_year ASAP, so this code is ahead of where it is used in dashboard--------
 #'jo_raw and emp_raw tibbles are wide and contain unwanted aggregates.
 #' e.g. when we are breaking down by noc we want it to be for all industries but we drop the aggregate NOC.
@@ -201,6 +205,7 @@ noc4 <- group_nest_agg(long_and_noc_mapping, noc4)%>%
 
 occupation_outlook <- bind_rows(noc1, noc2, noc3, noc4)%>%
   get_measures()%>%
+  left_join(typical_education)%>%
   select(-noc)%>%
   rename(NOC1=noc1,
          NOC2=noc2,

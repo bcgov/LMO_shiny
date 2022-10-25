@@ -23,13 +23,13 @@ library(plotly)
 library(kableExtra)
 library(wrapR)
 source(here::here("R","functions.R"))
-current_year <- 2022
+
 occupation_outlook <- vroom::vroom(here::here("shiny_data","occupation_outlook.csv"))
 industry_outlook <- vroom::vroom(here::here("shiny_data","industry_outlook.csv"))
 ds_and_jo_tab <- vroom::vroom(here::here("shiny_data","ds_and_jo_tab.csv"))
 ds_and_jo <-  vroom::vroom(here::here("shiny_data","ds_and_jo.csv"))
 regional <-  vroom::vroom(here::here("shiny_data","regional.csv"))
-
+current_year <- min(ds_and_jo$date)-1 #ds_and_jo has current year filtered out so off by 1
 page_titles <- c("Landing Page",
                  "Highlights Part 1",
                  "Annual Outlook",
@@ -506,6 +506,7 @@ selectizeGroupUI(
 
 occupation_outlook_plot <- occupation_outlook%>%
   filter(!name %in% c("First Five Cagr","Second Five Cagr", "Annual Replacement Rate"))%>%
+  select(-Typical_Education)%>%
   pivot_wider()%>%
   rename("Job Openings {current_year+1}-{current_year+10}" := `Job Openings`,
         "Employment {current_year}" := `Employment Level`,
@@ -590,18 +591,68 @@ nav_but(direction = "previous", current_page = 7)
 nav_but(direction = "next", current_page = 7)
 ```
 
-Row {data-height=500}
+### Inputs
+
+```{r}
+selectizeGroupUI(
+        id = "industry_filters_table",
+        inline = FALSE,
+        params = list(
+          var_one = list(inputId = "name", title = "Choose a Variable", placeholder = "select"),
+          var_two = list(inputId = "Geographic_Area", title = "Choose a Geographic Area", placeholder = "select"),
+          var_three = list(inputId = "aggregate_industry", title = "Choose an Aggregate Industry", placeholder = "select")
+        )
+      )
+
+industry_outlook_table <- industry_outlook%>%
+  pivot_wider()%>%
+  rename("Annual Replacement Rate(%)"=`Annual Replacement Rate`,
+         "Employment {current_year}" := `Employment Level`,
+         "Job Openings As Share Of Employment(%)" = `Job Openings As Share Of Employment`,
+         "Employment Growth(%) {current_year+1}-{current_year+5}" := `First Five Cagr`,
+         "Employment Growth(%) {current_year+1}-{current_year+10}" := `Ten Year Cagr`,
+         "Employment Growth(%) {current_year+6}-{current_year+10}" := `Second Five Cagr`,
+         "Job Openings Expansion {current_year+1}-{current_year+10}" := `Expansion Demand`,
+         "Job Openings Replacement {current_year+1}-{current_year+10}" := `Replacement Demand`,
+         "Job Openings {current_year+1}-{current_year+10}" := `Job Openings`)%>%
+  pivot_longer(cols=-c(Geographic_Area, aggregate_industry, industry)) 
+
+industry_mod_table <- callModule(
+    module = selectizeGroupServer,
+    id = "industry_filters_table",
+    data = industry_outlook_table,
+    vars = c(
+      "name",
+      "Geographic_Area",
+      "aggregate_industry"
+    )
+)
+
+industry_agg_table <- reactive({
+  case_when(is.null(input[["industry_filters_table-aggregate_industry"]]) ~ "aggregate_industry",
+            TRUE~"industry")
+})
+
+industry_tbbl_table <- reactive({
+  industry_mod_table()%>%
+    distinct(Geographic_Area, name, get(industry_agg_table()), .keep_all = TRUE)%>%
+    select(Geographic_Area, name, value, industry ="get(industry_agg_table())")%>%
+    na.omit()%>%
+    pivot_wider()
+})
+
+```
+
+
+Row
 -------------------------------------
-###
+### 
 
-###
-
-Row {data-height=500}
--------------------------------------
-###
-
-###
-
+```{r}
+DT::renderDT({
+  DT::datatable(industry_tbbl_table())
+})
+```
 
 `r page_titles[8]` {data-navmenu="Table of Contents"}
 ========================================
@@ -619,17 +670,11 @@ nav_but(direction = "next", current_page = 8)
 
 ```
 
-Row {data-height=500}
+Row 
 -------------------------------------
-###
+### ocdt
 
-###
 
-Row {data-height=500}
--------------------------------------
-###
-
-###
 
 `r page_titles[9]` {data-navmenu="Table of Contents"}
 ========================================
