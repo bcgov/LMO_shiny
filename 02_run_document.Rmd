@@ -25,6 +25,7 @@ library(wrapR)
 source(here::here("R","functions.R"))
 current_year <- 2022
 occupation_outlook <- vroom::vroom(here::here("shiny_data","occupation_outlook.csv"))
+industry_outlook <- vroom::vroom(here::here("shiny_data","industry_outlook.csv"))
 ds_and_jo_tab <- vroom::vroom(here::here("shiny_data","ds_and_jo_tab.csv"))
 ds_and_jo <-  vroom::vroom(here::here("shiny_data","ds_and_jo.csv"))
 regional <-  vroom::vroom(here::here("shiny_data","regional.csv"))
@@ -132,7 +133,7 @@ tbbl <- ds_and_jo_tab %>%
 gsub("<thead>.*</thead>", "", tbbl)
 ```   
 
-###     
+### Job Openings by Education Level   
 
 ```{r, fig.retina=2}
 pie <- readxl::read_excel(here::here("raw_data","Education 2022E.xlsx"))
@@ -168,11 +169,11 @@ selectInput(
 col_data <- reactive({
   filter(ds_and_jo,
        geographic_area == input$annual_outlook,
-       name %in% c("Expansion Demand","Replacement Demand"))
+       name %in% c("Expansion Demand", "Replacement Demand"))
 })
 pie_data <- reactive({
   col_data()%>%
-  group_by(name)%>%
+  group_by(name)%>%annual_employment_growth
   summarise(value=round(sum(value),-3))
 })
 ct_reactive <- reactive({
@@ -300,7 +301,7 @@ Row
 ###
 ```{r}
 leaflet::renderLeaflet({
-  aest::aest_choropleth(map_tbbl(), geographic_area, name, value)
+  bc_reg_choro(map_tbbl(), geographic_area, name, value)
 })
 ```
 
@@ -397,19 +398,71 @@ nav_but(direction = "previous", current_page = 5)
 nav_but(direction = "next", current_page = 5)
 
 ```
+### Inputs
 
-Row {data-height=500}
+```{r}
+selectizeGroupUI(
+        id = "industry_filters",
+        inline = FALSE,
+        params = list(
+          var_one = list(inputId = "name", title = "Choose a Variable", placeholder = "select"),
+          var_two = list(inputId = "Geographic_Area", title = "Choose a Geographic Area", placeholder = "select"),
+          var_three = list(inputId = "aggregate_industry", title = "Choose an Aggregate Industry", placeholder = "select")
+        )
+      )
+
+industry_mod <- callModule(
+    module = selectizeGroupServer,
+    id = "industry_filters",
+    data = industry_outlook,
+    vars = c(
+      "name",
+      "Geographic_Area",
+      "aggregate_industry"
+    )
+)
+
+industry_agg <- reactive({
+  case_when(is.null(input[["industry_filters-aggregate_industry"]]) ~ "aggregate_industry",
+            TRUE~"industry")
+})
+
+industry_tbbl <- reactive({
+  industry_mod()%>%
+    distinct(Geographic_Area, name, get(industry_agg()), .keep_all = TRUE)%>%
+    select(Geographic_Area, name, value, industry ="get(industry_agg())")%>%
+    na.omit()
+})
+
+```
+
+Row 
 -------------------------------------
 ###
 
-###
-
-Row {data-height=500}
--------------------------------------
-###
-
-###
-
+```{r fig.retina=2}
+renderPlotly({
+  plt <- industry_tbbl()%>%
+    ggplot(aes(value,
+               fct_reorder(industry, value, .fun = max),
+               fill= fct_reorder(Geographic_Area, value, .fun = max),
+               text= paste0(
+                "Geographic Area: ", Geographic_Area, "\n",
+                "Industry: ", industry, "\n",
+                "Value: ", scales::comma(value, accuracy = .01))
+               ))+
+    geom_col(position = "dodge2")+
+    scale_x_continuous(labels = scales::comma)+
+    scale_fill_viridis_d()+
+    facet_wrap(vars(name), scales = "free_x")+
+    labs(x="",y="")+
+    guides(fill = guide_legend(reverse=TRUE))+
+    theme_minimal()+
+    theme(axis.text.x = element_text(angle = 15))
+  ggplotly(plt, tooltip="text")%>%
+    config(displayModeBar = F)
+})
+```
 
 `r page_titles[6]`  {data-navmenu="Table of Contents"}
 ========================================
@@ -430,7 +483,7 @@ nav_but(direction = "next", current_page = 6)
 
 ```{r}
 selectizeGroupUI(
-        id = "my-filters",
+        id = "occupation_filters",
         inline = FALSE,
         params = list(
           var_one = list(inputId = "name", title = "Choose a Variable", placeholder = "select"),
@@ -441,9 +494,9 @@ selectizeGroupUI(
         )
       )
 
-res_mod <- callModule(
+occupation_mod <- callModule(
     module = selectizeGroupServer,
-    id = "my-filters",
+    id = "occupation_filters",
     data = occupation_outlook,
     vars = c(
       "name",
@@ -455,22 +508,21 @@ res_mod <- callModule(
 )
 
 noc_agg <- reactive({
-  case_when(is.null(input[["my-filters-NOC1"]]) & 
-           is.null(input[["my-filters-NOC2"]]) &
-           is.null(input[["my-filters-NOC3"]]) ~ "NOC1",
-           is.null(input[["my-filters-NOC2"]]) & 
-           is.null(input[["my-filters-NOC3"]]) ~ "NOC2",
-           is.null(input[["my-filters-NOC3"]]) ~ "NOC3",
+  case_when(is.null(input[["occupation_filters-NOC1"]]) & 
+           is.null(input[["occupation_filters-NOC2"]]) &
+           is.null(input[["occupation_filters-NOC3"]]) ~ "NOC1",
+           is.null(input[["occupation_filters-NOC2"]]) & 
+           is.null(input[["occupation_filters-NOC3"]]) ~ "NOC2",
+           is.null(input[["occupation_filters-NOC3"]]) ~ "NOC3",
            TRUE~"NOC4")
 })
 
-tbbl <- reactive({
-  res_mod()%>%
+occupation_tbbl <- reactive({
+  occupation_mod()%>%
     distinct(Geographic_Area, name, get(noc_agg()), .keep_all = TRUE)%>%
     select(Geographic_Area, name, value, noc="get(noc_agg())")%>%
     na.omit()
 })
-
 
 ```
 
@@ -481,7 +533,7 @@ Row
 
 ```{r fig.retina=2}
 renderPlotly({
-  plt <- tbbl()%>%
+  plt <- occupation_tbbl()%>%
     ggplot(aes(value,
                fct_reorder(noc, value, .fun = max),
                fill= fct_reorder(Geographic_Area, value, .fun = max),

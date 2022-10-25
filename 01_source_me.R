@@ -26,88 +26,19 @@ ds_raw <- vroom::vroom(here("raw_data",
                    skip=3,
                    col_select = -1)
 
+# we need current_year ASAP, so this code is ahead of where it is used in dashboard--------
+#'jo_raw and emp_raw tibbles are wide and contain unwanted aggregates.
+#' e.g. when we are breaking down by noc we want it to be for all industries but we drop the aggregate NOC.
+#' when we are breaking down by industry we want it to be for all NOC, but we drop the all industry aggregate.
 
-# occupation outlook--------
+long_by_noc <- bind_long_by(jo_raw, employment_raw, "noc")%>%
+  select(-industry)
+long_by_industry <- bind_long_by(jo_raw, employment_raw, "industry")%>%
+  select(-noc,-description)
 
-jo_not_total_noc <-jo_raw%>%
-  filter(Industry=="All industries",
-         NOC!="#T")%>%
-  select(-Industry)%>%
-  pivot_longer(cols=-c(NOC, Description, Variable, `Geographic Area`),
-               names_to = "date",
-               values_to = "value")%>%
-  mutate(date=as.numeric(date))%>%
-  clean_tbbl()
+current_year <- min(long_by_noc$date)
 
-current_year <- min(jo_not_total_noc$date)
-
-emp_not_total_noc <- employment_raw%>%
-  filter(Industry=="All industries",
-         NOC!="#T")%>%
-  select(-Industry)%>%
-  pivot_longer(cols=-c(NOC, Description, Variable, `Geographic Area`),
-               names_to = "date",
-               values_to = "value")%>%
-  mutate(date=as.numeric(date))%>%
-  clean_tbbl()
-
-noc_mapping <- vroom::vroom(here::here("raw_data","noc_mapping.csv"))
-
-long <- bind_rows(jo_not_total_noc, emp_not_total_noc)%>%
-  full_join(noc_mapping)
-
-two_to_one <- unique(noc_mapping[c("noc1","noc2")])
-three_to_one <- unique(noc_mapping[c("noc1","noc2","noc3")])
-
-noc1 <- long%>%
-  group_by(noc1, geographic_area)%>%
-  nest()%>%
-  mutate(data=map(data, agg_var_by_year))%>%
-  mutate(noc2=NA,
-         noc3=NA,
-         noc4=NA)
-
-noc2 <- long%>%
-  group_by(noc2, geographic_area)%>%
-  nest()%>%
-  mutate(data=map(data, agg_var_by_year))%>%
-  inner_join(two_to_one)%>%
-  mutate(noc3=NA,
-         noc4=NA)
-
-noc3 <- long%>%
-  group_by(noc3, geographic_area)%>%
-  nest()%>%
-  mutate(data=map(data, agg_var_by_year))%>%
-  inner_join(three_to_one)%>%
-  mutate(noc4=NA)
-
-noc4 <- long%>%
-  group_by(noc4, geographic_area)%>%
-  nest()%>%
-  mutate(data=map(data, agg_var_by_year))%>%
-  inner_join(noc_mapping)
-
-occupation_outlook <- bind_rows(noc1, noc2, noc3, noc4)%>%
-  mutate(job_openings=map_dbl(data, get_sum, "job_openings"),
-         employment_level=map_dbl(data, get_current, "employment"),
-         annual_employment_growth=map_dbl(data, get_cagr),
-         job_openings_as_share_of_employment=job_openings/employment_level,
-         expansion_demand=map_dbl(data, get_sum, "expansion_demand"),
-         replacement_demand=map_dbl(data, get_sum, "replacement_demand")
-         )%>%
-  select(-data, -noc)%>%
-  pivot_longer(cols=job_openings:replacement_demand, names_to = "name", values_to = "value")%>%
-  camel_to_title()%>%
-  rename(Geographic_Area=geographic_area,
-         NOC1=noc1,
-         NOC2=noc2,
-         NOC3=noc3,
-         NOC4=noc4)
-
-write_csv(occupation_outlook, here::here("shiny_data","occupation_outlook.csv"))
-
-#ds_and_jo----------------
+# #ds_and_jo----------------
 
 jo_total_noc <- jo_raw%>%
   filter(Industry=="All industries",
@@ -121,7 +52,7 @@ jo_total_noc <- jo_raw%>%
   filter(date>current_year)%>%
   filter(variable %in% c("job_openings", "expansion_demand","replacement_demand"))%>%
   pivot_wider(names_from = variable, values_from = value)%>%
-#  mutate(decline_unemployment=round(job_openings*.0189, -3))%>% #WTF???
+  #  mutate(decline_unemployment=round(job_openings*.0189, -3))%>% #WTF???
   select(-noc,-description)%>%
   pivot_longer(cols=-c(date, geographic_area))
 
@@ -206,8 +137,8 @@ emp_total_noc <- employment_raw%>%
   group_by(geographic_area)%>%
   nest()%>%
   mutate(current_employment=map_dbl(data, get_current, "employment"),
-         employment_growth=map_dbl(data, get_cagr)
-         )%>%
+         employment_growth=map_dbl(data, get_cagr, "ten")
+  )%>%
   select(-data)%>%
   pivot_longer(cols=-geographic_area)
 
@@ -223,6 +154,60 @@ regional <- jo_total_noc%>%
   pivot_longer(cols=-geographic_area)
 
 write_csv(regional, here::here("shiny_data","regional.csv"))
+
+#industry outlook-------------
+industry_mapping <- vroom::vroom(here::here("raw_data","industry_to_agg_mapping.csv"), delim=",")%>%
+  distinct()
+
+long_and_industry_mapping <- long_by_industry%>%
+  full_join(industry_mapping)
+
+by_aggregate <- group_nest_agg(long_and_industry_mapping, aggregate_industry)%>%
+  mutate(industry=NA)
+
+by_industry <- group_nest_agg(long_and_industry_mapping, industry)%>%
+  left_join(industry_mapping, multiple = "all")
+
+industry_outlook <- bind_rows(by_aggregate, by_industry)%>%
+  get_measures()
+
+write_csv(industry_outlook, here::here("shiny_data","industry_outlook.csv"))
+
+#occupation outlook-----------------
+noc_mapping <- vroom::vroom(here::here("raw_data","noc_mapping.csv"))
+
+long_and_noc_mapping <- long_by_noc%>%
+  full_join(noc_mapping)
+
+two_to_one <- unique(noc_mapping[c("noc1","noc2")])
+three_to_one <- unique(noc_mapping[c("noc1","noc2","noc3")])
+
+noc1 <- group_nest_agg(long_and_noc_mapping, noc1)%>%
+   mutate(noc2=NA,
+         noc3=NA,
+         noc4=NA)
+
+noc2 <- group_nest_agg(long_and_noc_mapping, noc2)%>%
+  inner_join(two_to_one)%>%
+  mutate(noc3=NA,
+         noc4=NA)
+
+noc3 <- group_nest_agg(long_and_noc_mapping, noc3)%>%
+  inner_join(three_to_one)%>%
+  mutate(noc4=NA)
+
+noc4 <- group_nest_agg(long_and_noc_mapping, noc4)%>%
+   inner_join(noc_mapping)
+
+occupation_outlook <- bind_rows(noc1, noc2, noc3, noc4)%>%
+  get_measures()%>%
+  select(-noc)%>%
+  rename(NOC1=noc1,
+         NOC2=noc2,
+         NOC3=noc3,
+         NOC4=noc4)
+
+write_csv(occupation_outlook, here::here("shiny_data","occupation_outlook.csv"))
 tictoc::toc()
 
 
