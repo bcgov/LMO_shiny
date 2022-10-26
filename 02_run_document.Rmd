@@ -25,11 +25,12 @@ library(wrapR)
 source(here::here("R","functions.R"))
 
 occupation_outlook <- vroom::vroom(here::here("shiny_data","occupation_outlook.csv"))
+occupation_outlook_table <- vroom::vroom(here::here("shiny_data","occupation_outlook_table.csv"))
 industry_outlook <- vroom::vroom(here::here("shiny_data","industry_outlook.csv"))
 ds_and_jo_tab <- vroom::vroom(here::here("shiny_data","ds_and_jo_tab.csv"))
 ds_and_jo <-  vroom::vroom(here::here("shiny_data","ds_and_jo.csv"))
 regional <-  vroom::vroom(here::here("shiny_data","regional.csv"))
-current_year <- min(ds_and_jo$date)-1 #ds_and_jo has current year filtered out so off by 1
+current_year <- min(ds_and_jo$date)-1
 page_titles <- c("Landing Page",
                  "Highlights Part 1",
                  "Annual Outlook",
@@ -136,9 +137,16 @@ gsub("<thead>.*</thead>", "", tbbl)
 ### Job Openings by Education Level   
 
 ```{r, fig.retina=2}
-pie <- readxl::read_excel(here::here("raw_data","Education 2022E.xlsx"))
-ct <- paste(scales::comma(round(sum(pie$Openings),-3)),"Job Openings \n Expected in B.C")
-aest::aest_donut(pie, Openings, group_var = `Type of Education`, center_text = ct, center_text_size = 2.5, lab_size=2.5)
+pie <- occupation_outlook%>%
+  filter(Geographic_Area=="British Columbia",
+         name=="Job Openings",
+         !is.na(NOC4))%>%
+  group_by(Typical_Education)%>%
+  summarize(`Job Openings`=sum(value))
+
+#pie <- readxl::read_excel(here::here("raw_data","Education 2022E.xlsx"))
+ct <- paste(scales::comma(round(sum(pie$`Job Openings`)+1,-3)),"Job Openings \n Expected in B.C")
+aest::aest_donut(pie, `Job Openings`, group_var = Typical_Education, center_text = ct, center_text_size = 2.5, lab_size=2.5)
 ```
 
 `r page_titles[3]`  {data-navmenu="Table of Contents"}
@@ -598,7 +606,7 @@ selectizeGroupUI(
         id = "industry_filters_table",
         inline = FALSE,
         params = list(
-          var_one = list(inputId = "name", title = "Choose a Variable", placeholder = "select"),
+         # var_one = list(inputId = "name", title = "Choose a Variable", placeholder = "select"),
           var_two = list(inputId = "Geographic_Area", title = "Choose a Geographic Area", placeholder = "select"),
           var_three = list(inputId = "aggregate_industry", title = "Choose an Aggregate Industry", placeholder = "select")
         )
@@ -622,7 +630,7 @@ industry_mod_table <- callModule(
     id = "industry_filters_table",
     data = industry_outlook_table,
     vars = c(
-      "name",
+   #   "name",
       "Geographic_Area",
       "aggregate_industry"
     )
@@ -654,6 +662,7 @@ DT::renderDT({
 })
 ```
 
+
 `r page_titles[8]` {data-navmenu="Table of Contents"}
 ========================================
 
@@ -670,11 +679,73 @@ nav_but(direction = "next", current_page = 8)
 
 ```
 
+### Inputs
+
+```{r}
+selectizeGroupUI(
+        id = "occupation_filters_table",
+        inline = FALSE,
+        params = list(
+          var_one = list(inputId = "Typical_Education", title = "Choose an education level", placeholder = "select"),
+          var_two = list(inputId = "Geographic_Area", title = "Choose a Geographic Area", placeholder = "select"),
+          var_three = list(inputId = "NOC1", title = "Choose a NOC1", placeholder = "select"),
+          var_four = list(inputId = "NOC2", title = "Choose a NOC2", placeholder = "select"),
+          var_five = list(inputId = "NOC3", title = "Choose a NOC3", placeholder = "select")
+        )
+      )
+
+occupation_outlook_table <- occupation_outlook_table%>%
+  filter(name %in% c("Employment Level","Expansion Demand","Replacement Demand","Job Openings"))%>%
+  pivot_wider()%>%
+  rename("Job Openings {current_year+1}-{current_year+10}" := `Job Openings`,
+        "Employment {current_year}" := `Employment Level`,
+        "Expansion Demand {current_year+1}-{current_year+10}" := `Expansion Demand`,
+        "Replacement Demand {current_year+1}-{current_year+10}" := `Replacement Demand`)%>%
+  pivot_longer(cols=-c(Geographic_Area, Typical_Education, NOC1, NOC2, NOC3, NOC4))
+
+occupation_mod_table <- callModule(
+    module = selectizeGroupServer,
+    id = "occupation_filters_table",
+    data = occupation_outlook_table,
+    vars = c(
+      "Typical_Education",
+      "Geographic_Area",
+      "NOC1",
+      "NOC2",
+      "NOC3"
+    )
+)
+
+noc_agg_table <- reactive({
+  case_when(is.null(input[["occupation_filters_table-NOC1"]]) &
+           is.null(input[["occupation_filters_table-NOC2"]]) &
+           is.null(input[["occupation_filters_table-NOC3"]]) ~ "NOC1",
+           is.null(input[["occupation_filters_table-NOC2"]]) &
+           is.null(input[["occupation_filters_table-NOC3"]]) ~ "NOC2",
+           is.null(input[["occupation_filters_table-NOC3"]]) ~ "NOC3",
+           TRUE~"NOC4")
+})
+
+occupation_tbbl_table <- reactive({
+  occupation_mod_table()%>%
+    distinct(Geographic_Area, name, get(noc_agg_table()), .keep_all = TRUE)%>%
+    select(Geographic_Area, Typical_Education, name, value, noc="get(noc_agg_table())")%>%
+    filter(!is.na(noc))%>%
+    pivot_wider()
+})
+
+```
+
+
 Row 
 -------------------------------------
-### ocdt
+### 
 
-
+```{r}
+DT::renderDT({
+  occupation_tbbl_table()
+})
+```
 
 `r page_titles[9]` {data-navmenu="Table of Contents"}
 ========================================

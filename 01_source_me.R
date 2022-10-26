@@ -78,7 +78,7 @@ ds_total_noc <- ds_raw%>%
          immigrants=`net_international_in-migration`,
          migrants_from_other_provinces=`net_interregional_in-migration`)%>%
   select(-noc, -description, -industry)%>%
-  pivot_longer(cols=-c(date,geographic_area))
+  pivot_longer(cols=-c(date, geographic_area))
 
 ds_and_jo <- bind_rows(jo_total_noc, ds_total_noc)%>%
   pivot_wider(names_from = name, values_from = value)%>%
@@ -177,7 +177,7 @@ industry_outlook <- bind_rows(by_aggregate, by_industry)%>%
 
 write_csv(industry_outlook, here::here("shiny_data","industry_outlook.csv"))
 
-#occupation outlook-----------------
+#occupation outlook plot-----------------
 noc_mapping <- vroom::vroom(here::here("raw_data","noc_mapping.csv"))
 
 long_and_noc_mapping <- long_by_noc%>%
@@ -186,33 +186,32 @@ long_and_noc_mapping <- long_by_noc%>%
 two_to_one <- unique(noc_mapping[c("noc1","noc2")])
 three_to_one <- unique(noc_mapping[c("noc1","noc2","noc3")])
 
-noc1 <- group_nest_agg(long_and_noc_mapping, noc1)%>%
-   mutate(noc2=NA,
-         noc3=NA,
-         noc4=NA)
+occupation_outlook_no_ed <- aggregate_by_noc(long_and_noc_mapping)
 
-noc2 <- group_nest_agg(long_and_noc_mapping, noc2)%>%
-  inner_join(two_to_one)%>%
-  mutate(noc3=NA,
-         noc4=NA)
-
-noc3 <- group_nest_agg(long_and_noc_mapping, noc3)%>%
-  inner_join(three_to_one)%>%
-  mutate(noc4=NA)
-
-noc4 <- group_nest_agg(long_and_noc_mapping, noc4)%>%
-   inner_join(noc_mapping)
-
-occupation_outlook <- bind_rows(noc1, noc2, noc3, noc4)%>%
-  get_measures()%>%
+occupation_outlook <- occupation_outlook_no_ed%>%
   left_join(typical_education)%>%
-  select(-noc)%>%
-  rename(NOC1=noc1,
-         NOC2=noc2,
-         NOC3=noc3,
-         NOC4=noc4)
+  select(-noc)
 
 write_csv(occupation_outlook, here::here("shiny_data","occupation_outlook.csv"))
+
+#occupation outlook table------------------------
+#' this was tricky... typical education only provided at 4 digit level... So we partition the data by typical
+#' education and then do the aggregation by noc for each of the typical education levels.
+
+
+occupation_outlook_table <- long_and_noc_mapping%>%
+  left_join(typical_education)%>%
+  group_by(`Typical_Education`)%>%
+  nest()%>%
+  mutate(data=map(data, aggregate_by_noc))%>%
+  unnest(data)%>%
+  select(-noc)
+
+write_csv(occupation_outlook_table, here::here("shiny_data","occupation_outlook_table.csv"))
+
 tictoc::toc()
+
+
+
 
 
