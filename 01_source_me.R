@@ -1,10 +1,15 @@
 tictoc::tic()
+#libraries------------
 library("data.table")
-library("tidyverse")
+library("tidytable")
 library("lubridate")
 library("here")
 library("readxl")
 library("wrapR")
+#constants------------
+round_small <- 2 #round to 2 digits
+round_medium <- -1 #round to nearest 10
+round_large <- -3 #round to nearest 1000
 # Functions------------------
 source(here::here("R","functions.R"))
 #read in dataframes--------------
@@ -29,6 +34,24 @@ ds_raw <- vroom::vroom(here("raw_data",
 typical_education <- read_excel(here::here("raw_data","Occupational Characteristics based on LMO 2022E 2022-Aug.xlsx"), skip=3, sheet = "Characteristics")%>%
   janitor::clean_names()%>%
   select(noc=noc_2016, Typical_Education=typical_education_background_2022_editon)
+
+wages <- read_excel(here::here("raw_data","2021 Wages.xlsx"))%>%
+  janitor::clean_names()%>%
+  rename(noc=noc_2016)%>%
+  mutate(across(contains("wage"), ~if_else(.x > 3000, round(.x/1730,2), .x))) #converts annual salary to hourly wage rate
+
+interests <- read_excel(here::here("raw_data","Occupational Characteristics based on LMO 2022E 2022-Aug.xlsx"),
+                        sheet="Characteristics",
+                        skip=3)%>%
+  janitor::clean_names()%>%
+  select(noc=noc_2016,
+         interests)
+
+whos_hoo <- read_excel(here::here("raw_data","HOO list 2022E.xlsx"))%>%
+  janitor::clean_names()%>%
+  filter(high_opportunity_occupation=="Yes")%>%
+  mutate(hoo=TRUE)%>%
+  select(-high_opportunity_occupation)
 
 # we need current_year ASAP, so this code is ahead of where it is used in dashboard--------
 #'jo_raw and emp_raw tibbles are wide and contain unwanted aggregates.
@@ -56,7 +79,6 @@ jo_total_noc <- jo_raw%>%
   filter(date>current_year)%>%
   filter(variable %in% c("job_openings", "expansion_demand","replacement_demand"))%>%
   pivot_wider(names_from = variable, values_from = value)%>%
-  #  mutate(decline_unemployment=round(job_openings*.0189, -3))%>% #WTF???
   select(-noc,-description)%>%
   pivot_longer(cols=-c(date, geographic_area))
 
@@ -96,14 +118,14 @@ jo_total <- jo_total_noc%>%
   filter(geographic_area=="british_columbia",
          name=="job_openings",
          date>current_year)%>%
-  summarize(value=round(sum(value),-3))%>%
+  summarize(value=round(sum(value), round_large))%>%
   pull(value)
 
 jo_tab <- ds_and_jo%>%
   filter(name %in% c("job_openings","expansion_demand","replacement_demand"),
          geographic_area=="british_columbia")%>%
   group_by(name)%>%
-  summarize(value=round(sum(value), -3))%>%
+  summarize(value=round(sum(value), round_large))%>%
   arrange(desc(value))%>%
   mutate(percent=scales::percent(2*value/sum(value)),
          name=str_to_title(str_replace_all(name,"_"," "))
@@ -117,7 +139,7 @@ ds_tab <- ds_and_jo%>%
                      "additional_supply_requirement"),
          geographic_area=="british_columbia")%>%
   group_by(name)%>%
-  summarize(value=round(sum(value), -3))%>%
+  summarize(value=round(sum(value), round_large))%>%
   arrange(desc(value))%>%
   mutate(percent=scales::percent(value/jo_total, accuracy = 1),
          name=str_to_title(str_replace_all(name,"_"," "))
@@ -151,8 +173,9 @@ regional <- jo_total_noc%>%
   group_by(geographic_area, name)%>%
   summarize(value=sum(value))%>%
   bind_rows(emp_total_noc)%>%
-  bind_rows(aest::aest_bc_reg_pop())%>%
+  bind_rows(bc_reg_pop())%>%
   pivot_wider()%>%
+  mutate(employment_growth=employment_growth/100)%>%
   mutate(across(expansion_demand:current_employment, ~ .x/population, .names = "{.col}_per_capita"))%>%
   select(-population)%>%
   pivot_longer(cols=-geographic_area)
@@ -204,14 +227,31 @@ occupation_outlook_table <- long_and_noc_mapping%>%
   group_by(`Typical_Education`)%>%
   nest()%>%
   mutate(data=map(data, aggregate_by_noc))%>%
-  unnest(data)%>%
+  unnest(data)
+
+oot_no_noc <- occupation_outlook_table%>%
   select(-noc)
 
-write_csv(occupation_outlook_table, here::here("shiny_data","occupation_outlook_table.csv"))
+write_csv(oot_no_noc, here::here("shiny_data","occupation_outlook_table.csv"))
+
+# Job openings 500 occupations (hoo is a filtered version of this)------------
+
+wages_and_interests <- wages%>%
+  left_join(interests)
+
+just_jo <- occupation_outlook_table%>%
+  filter(name=="Job Openings")
+
+jo_500 <- wages_and_interests%>%
+  left_join(just_jo, by=c("noc"="noc"),  multiple = "all")%>%
+  pivot_wider()%>%
+  full_join(whos_hoo,
+            by=c("noc"="noc",
+                 "Geographic_Area"="geographic_area"),
+            multiple = "all"
+            )%>%
+  select(-noc, -description)
+
+write_csv(jo_500, here::here("shiny_data","jo_500.csv"))
 
 tictoc::toc()
-
-
-
-
-

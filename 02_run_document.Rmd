@@ -17,19 +17,31 @@ resource_files:
 ---
 
 ```{r}
+#libraries---------------
 library(tidyverse)
 library(shinyWidgets)
 library(plotly)
 library(kableExtra)
 library(wrapR)
+library(leaflet)
+#constants------------
+round_small <- 2 #round to 2 digits
+round_medium <- -1 #round to nearest 10
+round_large <- -3 #round to nearest 1000
+#functions----------
 source(here::here("R","functions.R"))
-
+#load data--------------
 occupation_outlook <- vroom::vroom(here::here("shiny_data","occupation_outlook.csv"))
 occupation_outlook_table <- vroom::vroom(here::here("shiny_data","occupation_outlook_table.csv"))
 industry_outlook <- vroom::vroom(here::here("shiny_data","industry_outlook.csv"))
 ds_and_jo_tab <- vroom::vroom(here::here("shiny_data","ds_and_jo_tab.csv"))
 ds_and_jo <-  vroom::vroom(here::here("shiny_data","ds_and_jo.csv"))
 regional <-  vroom::vroom(here::here("shiny_data","regional.csv"))
+jo_500 <-  vroom::vroom(here::here("shiny_data","jo_500.csv"))
+hoo <- jo_500%>%
+  filter(hoo==TRUE)%>%
+  select(-hoo)
+
 current_year <- min(ds_and_jo$date)-1
 page_titles <- c("Landing Page",
                  "Highlights Part 1",
@@ -145,7 +157,7 @@ pie <- occupation_outlook%>%
   summarize(`Job Openings`=sum(value))
 
 #pie <- readxl::read_excel(here::here("raw_data","Education 2022E.xlsx"))
-ct <- paste(scales::comma(round(sum(pie$`Job Openings`)+1,-3)),"Job Openings \n Expected in B.C")
+ct <- paste(scales::comma(round(sum(pie$`Job Openings`)+1, round_large)),"Job Openings \n Expected in B.C")
 aest::aest_donut(pie, `Job Openings`, group_var = Typical_Education, center_text = ct, center_text_size = 2.5, lab_size=2.5)
 ```
 
@@ -182,7 +194,7 @@ col_data <- reactive({
 pie_data <- reactive({
   col_data()%>%
   group_by(name)%>%
-  summarise(value=round(sum(value),-3))
+  summarise(value=round(sum(value), round_large))
 })
 ct_reactive <- reactive({
   paste("Total Job Openings: \n",scales::comma(sum(pie_data()$value)))
@@ -309,7 +321,7 @@ Row
 ###
 ```{r}
 leaflet::renderLeaflet({
-  bc_reg_choro(map_tbbl(), geographic_area, name, value)
+  bc_reg_choro2(map_tbbl(), geographic_area, name, value)
 })
 ```
 
@@ -383,7 +395,7 @@ renderUI({table_tbbl()$geographic_area[1]})
   </td>
   <td>
   ```{r}
-  renderUI({scales::percent(table_tbbl()$value[5]/100, accuracy=.1)})
+  renderUI({scales::percent(table_tbbl()$value[5], accuracy=.1)})
   ```
   </td>
   </tr>
@@ -657,9 +669,10 @@ Row
 ### 
 
 ```{r}
-DT::renderDT({
-  DT::datatable(industry_tbbl_table())
-})
+DT::renderDT(
+industry_tbbl_table()%>%
+    fix_col_names()
+)
 ```
 
 
@@ -742,9 +755,10 @@ Row
 ### 
 
 ```{r}
-DT::renderDT({
-  occupation_tbbl_table()
-})
+DT::renderDT(
+  occupation_tbbl_table()%>%
+    fix_col_names()
+)
 ```
 
 `r page_titles[9]` {data-navmenu="Table of Contents"}
@@ -763,17 +777,46 @@ nav_but(direction = "previous", current_page = 9)
 nav_but(direction = "next", current_page = 9)
 ```
 
-Row {data-height=500}
+### Inputs
+
+```{r}
+selectizeGroupUI(
+        id = "hoo_filters",
+        inline = FALSE,
+        params = list(
+          var_one = list(inputId = "Typical_Education", title = "Choose an education level", placeholder = "select"),
+          var_two = list(inputId = "Geographic_Area", title = "Choose a Geographic Area", placeholder = "select"),
+          var_three = list(inputId = "NOC1", title = "Choose a NOC1", placeholder = "select"),
+          var_four = list(inputId = "NOC2", title = "Choose a NOC2", placeholder = "select"),
+          var_five = list(inputId = "NOC3", title = "Choose a NOC3", placeholder = "select")
+        )
+      )
+
+hoo_mod <- callModule(
+    module = selectizeGroupServer,
+    id = "hoo_filters",
+    data = hoo,
+    vars = c(
+      "Typical_Education",
+      "Geographic_Area",
+      "NOC1",
+      "NOC2",
+      "NOC3"
+    )
+)
+
+```
+
+Row 
 -------------------------------------
 ###
 
-###
-
-Row {data-height=500}
--------------------------------------
-###
-
-###
+```{r}
+DT::renderDT({
+  hoo_mod()%>%
+    fix_col_names()
+})
+```
 
 
 `r page_titles[10]`  {data-navmenu="Table of Contents"}
@@ -791,17 +834,52 @@ nav_but(direction = "previous", current_page = 10)
 nav_but(direction = "next", current_page = 10)
 ```
 
-Row {data-height=500}
+### Inputs
+
+```{r}
+selectizeGroupUI(
+        id = "jo_500_filters",
+        inline = FALSE,
+        params = list(
+          var_one = list(inputId = "Typical_Education", title = "Choose an education level", placeholder = "select"),
+          var_two = list(inputId = "Geographic_Area", title = "Choose a Geographic Area", placeholder = "select"),
+          var_three = list(inputId = "NOC1", title = "Choose a NOC1", placeholder = "select"),
+          var_four = list(inputId = "NOC2", title = "Choose a NOC2", placeholder = "select"),
+          var_five = list(inputId = "NOC3", title = "Choose a NOC3", placeholder = "select")
+        )
+      )
+
+jo_500_mod <- callModule(
+    module = selectizeGroupServer,
+    id = "jo_500_filters",
+    data = jo_500,
+    vars = c(
+      "Typical_Education",
+      "Geographic_Area",
+      "NOC1",
+      "NOC2",
+      "NOC3"
+    )
+)
+
+```
+
+Row 
 -------------------------------------
 ###
 
-###
+```{r}
+DT::renderDT({
+  jo_500_mod()%>%
+    select(-hoo)%>%
+    fix_col_names()
+})
+```
 
-Row {data-height=500}
--------------------------------------
-###
 
-###
+
+
+
 
 `r page_titles[11]`  {data-navmenu="Table of Contents"} 
 =========================================
