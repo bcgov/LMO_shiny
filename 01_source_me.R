@@ -5,6 +5,8 @@ library("tidytable")
 library("lubridate")
 library("here")
 library("readxl")
+library("readr")
+library("stringr")
 library("wrapR")
 #constants------------
 round_small <- 2 #round to 2 digits
@@ -38,7 +40,8 @@ typical_education <- read_excel(here::here("raw_data","Occupational Characterist
 wages <- read_excel(here::here("raw_data","2021 Wages.xlsx"))%>%
   janitor::clean_names()%>%
   rename(noc=noc_2016)%>%
-  mutate(across(contains("wage"), ~if_else(.x > 3000, round(.x/1730,2), .x))) #converts annual salary to hourly wage rate
+  mutate(across(contains("wage"), ~if_else(.x > 3000, round(.x/1730,2), .x)))%>% #converts annual salary to hourly wage rate
+  mutate(across(contains("wage"), ~ na_if(., 0))) #replaces 0 wage with NA
 
 interests <- read_excel(here::here("raw_data","Occupational Characteristics based on LMO 2022E 2022-Aug.xlsx"),
                         sheet="Characteristics",
@@ -176,7 +179,7 @@ regional <- jo_total_noc%>%
   bind_rows(bc_reg_pop())%>%
   pivot_wider()%>%
   mutate(employment_growth=employment_growth/100)%>%
-  mutate(across(expansion_demand:current_employment, ~ .x/population, .names = "{.col}_per_capita"))%>%
+  mutate(across(c(expansion_demand, replacement_demand, current_employment), ~ .x/population, .names = "{.col}_per_capita"))%>%
   select(-population)%>%
   pivot_longer(cols=-geographic_area)
 

@@ -24,12 +24,13 @@ library(plotly)
 library(kableExtra)
 library(wrapR)
 library(leaflet)
+library(DT)
 #constants------------
 round_small <- 2 #round to 2 digits
 round_medium <- -1 #round to nearest 10
 round_large <- -3 #round to nearest 1000
 #functions----------
-source(here::here("R","functions.R"))
+source(here::here("R", "functions.R"))
 #load data--------------
 occupation_outlook <- vroom::vroom(here::here("shiny_data","occupation_outlook.csv"))
 occupation_outlook_table <- vroom::vroom(here::here("shiny_data","occupation_outlook_table.csv"))
@@ -197,7 +198,7 @@ pie_data <- reactive({
   summarise(value=round(sum(value), round_large))
 })
 ct_reactive <- reactive({
-  paste("Total Job Openings: \n",scales::comma(sum(pie_data()$value)))
+  ct <- paste(scales::comma(round(sum(pie_data()$value)+1, round_large)),"Job Openings \n Expected in",input$annual_outlook)
 })
 
 ```
@@ -361,7 +362,7 @@ renderUI({table_tbbl()$geographic_area[1]})
   </td>
   <td>
   ```{r}
-  renderUI({scales::comma(table_tbbl()$value[2], accuracy=1000)})
+  renderUI({scales::percent(table_tbbl()$value[2], accuracy=.1)})
   ```
   </td>
   <td>
@@ -395,7 +396,7 @@ renderUI({table_tbbl()$geographic_area[1]})
   </td>
   <td>
   ```{r}
-  renderUI({scales::percent(table_tbbl()$value[5], accuracy=.1)})
+  renderUI({scales::comma(table_tbbl()$value[5], accuracy=1000)})
   ```
   </td>
   </tr>
@@ -657,7 +658,7 @@ industry_tbbl_table <- reactive({
   industry_mod_table()%>%
     distinct(Geographic_Area, name, get(industry_agg_table()), .keep_all = TRUE)%>%
     select(Geographic_Area, name, value, industry ="get(industry_agg_table())")%>%
-    na.omit()%>%
+#    na.omit()%>%
     pivot_wider()
 })
 
@@ -670,8 +671,13 @@ Row
 
 ```{r}
 DT::renderDT(
-industry_tbbl_table()%>%
-    fix_col_names()
+  industry_tbbl_table()%>%
+    fix_col_names()%>%
+    datatable(rownames=FALSE)%>%
+    formatStyle(
+  'Industry',
+  target = 'row',
+  backgroundColor = styleEqual(c(NA), c('lightgray')))
 )
 ```
 
@@ -708,9 +714,10 @@ selectizeGroupUI(
       )
 
 occupation_outlook_table <- occupation_outlook_table%>%
-  filter(name %in% c("Employment Level","Expansion Demand","Replacement Demand","Job Openings"))%>%
+  filter(name %in% c("Employment Level","Expansion Demand","Replacement Demand","Job Openings", "Job Openings As Share Of Employment"))%>%
   pivot_wider()%>%
   rename("Job Openings {current_year+1}-{current_year+10}" := `Job Openings`,
+         "Job Openings As Share Of Employment(%)" = `Job Openings As Share Of Employment`,
         "Employment {current_year}" := `Employment Level`,
         "Expansion Demand {current_year+1}-{current_year+10}" := `Expansion Demand`,
         "Replacement Demand {current_year+1}-{current_year+10}" := `Replacement Demand`)%>%
@@ -743,7 +750,7 @@ occupation_tbbl_table <- reactive({
   occupation_mod_table()%>%
     distinct(Geographic_Area, name, get(noc_agg_table()), .keep_all = TRUE)%>%
     select(Geographic_Area, Typical_Education, name, value, noc="get(noc_agg_table())")%>%
-    filter(!is.na(noc))%>%
+#    filter(!is.na(noc))%>%
     pivot_wider()
 })
 
@@ -757,7 +764,12 @@ Row
 ```{r}
 DT::renderDT(
   occupation_tbbl_table()%>%
-    fix_col_names()
+     fix_col_names()%>%
+    datatable(rownames=FALSE)%>%
+    formatStyle(
+  'NOC',
+  target = 'row',
+  backgroundColor = styleEqual(c(NA), c('lightgray')))
 )
 ```
 
@@ -812,10 +824,17 @@ Row
 ###
 
 ```{r}
-DT::renderDT({
+DT::renderDT(
   hoo_mod()%>%
-    fix_col_names()
-})
+    rename("Job Openings {current_year}":=`Job Openings`)%>%
+    fix_col_names()%>%
+    datatable()%>%
+    formatStyle(
+  'Geographic Area',
+  target = 'row',
+  backgroundColor = styleEqual(c("Aggregate"), c('lightgray'))),
+  rownames=FALSE
+)
 ```
 
 
@@ -869,11 +888,22 @@ Row
 ###
 
 ```{r}
-DT::renderDT({
+DT::renderDT(
   jo_500_mod()%>%
     select(-hoo)%>%
-    fix_col_names()
-})
+    rename("Job Openings {current_year}":=`Job Openings`)%>%
+    add_totals()%>%
+    fix_col_names()%>%
+    datatable()%>%
+    formatStyle(
+  'Geographic Area',
+  target = 'row',
+  backgroundColor = styleEqual(c("Aggregate"), c('lightgray'))
+)
+    
+    ,
+  rownames=FALSE
+)
 ```
 
 
