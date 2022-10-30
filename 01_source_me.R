@@ -52,8 +52,7 @@ interests <- read_excel(here::here("raw_data","Occupational Characteristics base
 
 whos_hoo <- read_excel(here::here("raw_data","HOO list 2022E.xlsx"))%>%
   janitor::clean_names()%>%
-  filter(high_opportunity_occupation=="Yes")%>%
-  mutate(hoo=TRUE)%>%
+  mutate(hoo= if_else(high_opportunity_occupation=="Yes", TRUE, FALSE))%>%
   select(-high_opportunity_occupation)
 
 # we need current_year ASAP, so this code is ahead of where it is used in dashboard--------
@@ -237,7 +236,7 @@ oot_no_noc <- occupation_outlook_table%>%
 
 write_csv(oot_no_noc, here::here("shiny_data","occupation_outlook_table.csv"))
 
-# Job openings 500 occupations (hoo is a filtered version of this)------------
+# Job openings 500 occupations------------
 
 wages_and_interests <- wages%>%
   left_join(noc_mapping)%>%
@@ -268,10 +267,10 @@ just_jo <- occupation_outlook_table%>%
 jo_500 <- just_jo%>%
   left_join(wages_and_interests, by=c("noc"="noc","Typical_Education"="Typical_Education"))%>%
   select(-ends_with(".y"))%>%
-  rename(N0C1=NOC1.x,
-         N0C2=NOC2.x,
-         N0C3=NOC3.x,
-         N0C4=NOC4.x)%>%
+  rename(NOC1=NOC1.x,
+         NOC2=NOC2.x,
+         NOC3=NOC3.x,
+         NOC4=NOC4.x)%>%
   left_join(whos_hoo,
             by=c("noc"="noc",
                  "Geographic_Area"="geographic_area")
@@ -281,3 +280,5 @@ jo_500 <- just_jo%>%
 write_csv(jo_500, here::here("shiny_data","jo_500.csv"))
 
 tictoc::toc()
+
+

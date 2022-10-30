@@ -40,8 +40,11 @@ ds_and_jo <-  vroom::vroom(here::here("shiny_data","ds_and_jo.csv"))
 regional <-  vroom::vroom(here::here("shiny_data","regional.csv"))
 jo_500 <-  vroom::vroom(here::here("shiny_data","jo_500.csv"))
 hoo <- jo_500%>%
-  filter(hoo==TRUE)%>%
+  filter(hoo!=FALSE)%>%
   select(-hoo)
+jo_500 <- jo_500%>%
+  select(-hoo)
+#hoo <- occupation_outlook_table 
 
 current_year <- min(ds_and_jo$date)-1
 page_titles <- c("Landing Page",
@@ -763,7 +766,7 @@ Row
 ```{r}
 DT::renderDT(
   occupation_tbbl_table()%>%
-     fix_col_names()%>%
+    fix_col_names()%>%
     datatable(rownames=FALSE)%>%
     formatStyle(
   'NOC',
@@ -791,10 +794,74 @@ nav_but(direction = "next", current_page = 9)
 ### Inputs
 
 
+```{r}
+selectizeGroupUI(
+        id = "hoo_filters",
+        inline = FALSE,
+        params = list(
+          var_one = list(inputId = "Typical_Education", title = "Choose an education level", placeholder = "select"),
+          var_two = list(inputId = "Geographic_Area", title = "Choose a Geographic Area", placeholder = "select"),
+          var_three = list(inputId = "NOC1", title = "Choose a NOC1", placeholder = "select"),
+          var_four = list(inputId = "NOC2", title = "Choose a NOC2", placeholder = "select"),
+          var_five = list(inputId = "NOC3", title = "Choose a NOC3", placeholder = "select")
+        )
+      )
+
+
+hoo_mod <- callModule(
+    module = selectizeGroupServer,
+    id = "hoo_filters",
+    data = hoo,
+    vars = c(
+      "Typical_Education",
+      "Geographic_Area",
+      "NOC1",
+      "NOC2",
+      "NOC3"
+    )
+)
+
+hoo_noc <- reactive({
+  case_when(is.null(input[["hoo_filters-NOC1"]]) &
+           is.null(input[["hoo_filters-NOC2"]]) &
+           is.null(input[["hoo_filters-NOC3"]]) ~ "NOC1",
+           is.null(input[["hoo_filters-NOC2"]]) &
+           is.null(input[["hoo_filters-NOC3"]]) ~ "NOC2",
+           is.null(input[["hoo_filters-NOC3"]]) ~ "NOC3",
+           TRUE~"NOC4")
+})
+
+hoo_table <- reactive({
+  hoo_mod()%>%
+    distinct(Geographic_Area, name, get(hoo_noc()), .keep_all = TRUE)%>%
+    select(noc="get(hoo_noc())", everything())%>%
+    select(-NOC1,-NOC2,-NOC3,-NOC4)%>%
+    pivot_wider()
+})
+
+```
+
 
 Row 
 -------------------------------------
-###
+### 
+
+```{r}
+
+DT::renderDT(
+  hoo_table()%>%
+    fix_col_names()%>%
+    datatable(rownames=FALSE)%>%
+    formatStyle(
+  'NOC',
+  target = 'row',
+  backgroundColor = styleEqual(c(NA), c('lightgray')))
+)
+```
+
+
+
+
 
 
 `r page_titles[10]`  {data-navmenu="Table of Contents"}
@@ -815,11 +882,70 @@ nav_but(direction = "next", current_page = 10)
 ### Inputs
 
 
+```{r}
+selectizeGroupUI(
+        id = "jo_500_filters",
+        inline = FALSE,
+        params = list(
+          var_one = list(inputId = "Typical_Education", title = "Choose an education level", placeholder = "select"),
+          var_two = list(inputId = "Geographic_Area", title = "Choose a Geographic Area", placeholder = "select"),
+          var_three = list(inputId = "NOC1", title = "Choose a NOC1", placeholder = "select"),
+          var_four = list(inputId = "NOC2", title = "Choose a NOC2", placeholder = "select"),
+          var_five = list(inputId = "NOC3", title = "Choose a NOC3", placeholder = "select")
+        )
+      )
+
+
+jo_500_mod <- callModule(
+    module = selectizeGroupServer,
+    id = "jo_500_filters",
+    data = jo_500,
+    vars = c(
+      "Typical_Education",
+      "Geographic_Area",
+      "NOC1",
+      "NOC2",
+      "NOC3"
+    )
+)
+
+jo_500_noc <- reactive({
+  case_when(is.null(input[["jo_500_filters-NOC1"]]) &
+           is.null(input[["jo_500_filters-NOC2"]]) &
+           is.null(input[["jo_500_filters-NOC3"]]) ~ "NOC4",
+           is.null(input[["jo_500_filters-NOC2"]]) &
+           is.null(input[["jo_500_filters-NOC3"]]) ~ "NOC2",
+           is.null(input[["jo_500_filters-NOC3"]]) ~ "NOC3",
+           TRUE~"NOC4")
+})
+
+jo_500_table <- reactive({
+  jo_500_mod()%>%
+    distinct(Geographic_Area, name, get(jo_500_noc()), .keep_all = TRUE)%>%
+    select(noc="get(jo_500_noc())", everything())%>%
+    select(-NOC1,-NOC2,-NOC3,-NOC4)%>%
+    pivot_wider()
+})
+
+```
+
 
 Row 
 -------------------------------------
-###
+### 
 
+```{r}
+
+DT::renderDT(
+  jo_500_table()%>%
+    fix_col_names()%>%
+    datatable(rownames=FALSE)%>%
+    formatStyle(
+  'NOC',
+  target = 'row',
+  backgroundColor = styleEqual(c(NA), c('lightgray')))
+)
+```
 
 `r page_titles[11]`  {data-navmenu="Table of Contents"} 
 =========================================
