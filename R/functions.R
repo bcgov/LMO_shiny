@@ -4,26 +4,26 @@ agg_var_by_year <- function(tbbl){
   dt[ , .(value = sum(value)), by = c("date", "variable")]
 }
 get_sum <- function(tbbl, var){
-  round(sum(tbbl[variable == var & date > current_year, value]),-2)
+  round(sum(tbbl[variable == var & date > current_year, value]), round_medium)
 }
 get_current <- function(tbbl, var){
   x <- tbbl[tbbl$variable==var & tbbl$date==current_year, "value"]%>%
     pull()
-  round(x,-2)
+  round(x, round_medium)
 }
 get_ff_cagr <- function(tbbl){
   next_year <- tbbl[tbbl$variable=="employment" & tbbl$date==current_year+1, "value"]
   five_years <- tbbl[tbbl$variable=="employment" & tbbl$date==current_year+5, "value"]
   x <- 100*((five_years/next_year)^(.2)-1)%>%
     pull()
-  round(x,2)
+  round(x, round_small)
 }
 get_sf_cagr <- function(tbbl){
   five_years <- tbbl[tbbl$variable=="employment" & tbbl$date==current_year+6, "value"]
   ten_years <- tbbl[tbbl$variable=="employment" & tbbl$date==current_year+10, "value"]
   x <- 100*((ten_years/five_years)^(.2)-1)%>%
     pull()
-  round(x,2)
+  round(x, round_small)
 }
 
 get_ten_cagr <- function(tbbl){
@@ -31,7 +31,7 @@ get_ten_cagr <- function(tbbl){
   ten_years <- tbbl[tbbl$variable=="employment" & tbbl$date==current_year+10, "value"]
   x <- 100*((ten_years/next_year)^(.1)-1)%>%
     pull()
-  round(x,2)
+  round(x, round_small)
 }
 
 #'jo_raw and emp_raw tibbles are wide and contain unwanted aggregates.
@@ -75,10 +75,10 @@ get_measures <- function(tbbl){
            first_five_cagr=map_dbl(data, get_ff_cagr),
            second_five_cagr=map_dbl(data, get_sf_cagr),
            ten_year_cagr=map_dbl(data, get_ten_cagr),
-           job_openings_as_share_of_employment = round(job_openings/employment_level, 2),
+           job_openings_as_share_of_employment = round(100*job_openings/employment_level, round_small),
            expansion_demand=map_dbl(data, get_sum, "expansion_demand"),
            replacement_demand=map_dbl(data, get_sum, "replacement_demand"),
-           annual_replacement_rate=round(replacement_demand/employment_level*10, 2)
+           annual_replacement_rate=round(replacement_demand/employment_level*10, round_small)
     )%>%
     select(-data)%>%
     pivot_longer(cols=job_openings:annual_replacement_rate, names_to = "name", values_to = "value")%>%
@@ -111,6 +111,88 @@ aggregate_by_noc <- function(tbbl){
 make_title <- function(strng){
   strng <- str_to_title(str_replace_all(strng,"_"," "))
 }
+
+fix_col_names <- function(tbbl){
+  colnames(tbbl) <- str_to_title(str_replace_all(colnames(tbbl),"_"," "))
+  colnames(tbbl) <- str_replace_all(colnames(tbbl),"Noc","NOC")
+  tbbl
+}
+
+noc_mean_wage <- function(tbbl, noc){
+  tbbl%>%
+    group_by({{  noc  }})%>%
+    summarize(across(contains("wage"), ~round(mean(., na.rm=TRUE), round_small)))
+}
+
+get_mean_wages <- function(tbbl){
+  noc1 <- noc_mean_wage(tbbl, noc1)%>%
+    mutate(noc2=NA,
+           noc3=NA,
+           noc4=NA)
+  noc2 <- noc_mean_wage(tbbl, noc2)%>%
+    inner_join(two_to_one)%>%
+    mutate(noc3=NA,
+           noc4=NA)
+  noc3 <- noc_mean_wage(tbbl, noc3)%>%
+    inner_join(three_to_one)%>%
+    mutate(noc4=NA)
+  noc4 <- noc_mean_wage(tbbl, noc4)%>%
+    inner_join(noc_mapping)
+  bind_rows(noc1, noc2, noc3, noc4)%>%
+    rename(NOC1=noc1,
+           NOC2=noc2,
+           NOC3=noc3,
+           NOC4=noc4)
+}
+
+bc_reg_choro2<-function(tbbl, region, thingy, value) {
+  tbbl <- tbbl%>%
+    rename(region =  {{  region  }},
+           thingy = {{  thingy  }},
+           value = {{  value  }}
+    )%>%
+    ungroup()
+
+  shape <- bc_reg_sf()
+
+  tbbl <- shape%>%
+    left_join(tbbl, multiple = "all")
+
+  variable_plotted <- tbbl$thingy[1]
+
+  pal <- colorNumeric("viridis", domain = tbbl$value)
+  pal_rev <- colorNumeric("viridis", domain = tbbl$value, reverse = TRUE)
+
+  mytext <- paste(
+    "Region: ", str_to_title(str_replace_all(tbbl$region,"_"," ")),"<br/>",
+    str_to_title(str_replace_all(variable_plotted,"_"," ")), ": ", scales::percent(tbbl$value, accuracy = .1), "<br/>",
+    sep="") %>%
+    lapply(htmltools::HTML)
+  leaflet(tbbl,
+          options = leafletOptions(
+            attributionControl = FALSE
+          )
+  ) %>%
+    setView(lng = -125, lat = 55, zoom = 5) %>%
+    addProviderTiles("Esri.NatGeoWorldMap") %>%
+    addPolygons(
+      fillColor = ~ pal(value),
+      color = "black",
+      label=mytext,
+      fillOpacity = .5,
+      weight = 1
+    )%>%
+    addLegend("topright",
+              pal = pal_rev,
+              values = ~ value,
+              labFormat = labelFormat(
+                suffix="%",
+                transform = function(x) 100*sort(x, decreasing = TRUE)),
+              title = str_to_title(str_replace_all(variable_plotted,"_"," "))
+    )
+}
+
+
 
 # # this function take a tbbl with two columns, start and finish and returns either start OR a sequence between start and finish.
 # fill_range <- function(tbbl){

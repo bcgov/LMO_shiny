@@ -750,7 +750,6 @@ occupation_tbbl_table <- reactive({
   occupation_mod_table()%>%
     distinct(Geographic_Area, name, get(noc_agg_table()), .keep_all = TRUE)%>%
     select(Geographic_Area, Typical_Education, name, value, noc="get(noc_agg_table())")%>%
-#    filter(!is.na(noc))%>%
     pivot_wider()
 })
 
@@ -791,51 +790,11 @@ nav_but(direction = "next", current_page = 9)
 
 ### Inputs
 
-```{r}
-selectizeGroupUI(
-        id = "hoo_filters",
-        inline = FALSE,
-        params = list(
-          var_one = list(inputId = "Typical_Education", title = "Choose an education level", placeholder = "select"),
-          var_two = list(inputId = "Geographic_Area", title = "Choose a Geographic Area", placeholder = "select"),
-          var_three = list(inputId = "NOC1", title = "Choose a NOC1", placeholder = "select"),
-          var_four = list(inputId = "NOC2", title = "Choose a NOC2", placeholder = "select"),
-          var_five = list(inputId = "NOC3", title = "Choose a NOC3", placeholder = "select")
-        )
-      )
 
-hoo_mod <- callModule(
-    module = selectizeGroupServer,
-    id = "hoo_filters",
-    data = hoo,
-    vars = c(
-      "Typical_Education",
-      "Geographic_Area",
-      "NOC1",
-      "NOC2",
-      "NOC3"
-    )
-)
-
-```
 
 Row 
 -------------------------------------
 ###
-
-```{r}
-DT::renderDT(
-  hoo_mod()%>%
-    rename("Job Openings {current_year}":=`Job Openings`)%>%
-    fix_col_names()%>%
-    datatable()%>%
-    formatStyle(
-  'Geographic Area',
-  target = 'row',
-  backgroundColor = styleEqual(c("Aggregate"), c('lightgray'))),
-  rownames=FALSE
-)
-```
 
 
 `r page_titles[10]`  {data-navmenu="Table of Contents"}
@@ -855,60 +814,11 @@ nav_but(direction = "next", current_page = 10)
 
 ### Inputs
 
-```{r}
-selectizeGroupUI(
-        id = "jo_500_filters",
-        inline = FALSE,
-        params = list(
-          var_one = list(inputId = "Typical_Education", title = "Choose an education level", placeholder = "select"),
-          var_two = list(inputId = "Geographic_Area", title = "Choose a Geographic Area", placeholder = "select"),
-          var_three = list(inputId = "NOC1", title = "Choose a NOC1", placeholder = "select"),
-          var_four = list(inputId = "NOC2", title = "Choose a NOC2", placeholder = "select"),
-          var_five = list(inputId = "NOC3", title = "Choose a NOC3", placeholder = "select")
-        )
-      )
 
-jo_500_mod <- callModule(
-    module = selectizeGroupServer,
-    id = "jo_500_filters",
-    data = jo_500,
-    vars = c(
-      "Typical_Education",
-      "Geographic_Area",
-      "NOC1",
-      "NOC2",
-      "NOC3"
-    )
-)
-
-```
 
 Row 
 -------------------------------------
 ###
-
-```{r}
-DT::renderDT(
-  jo_500_mod()%>%
-    select(-hoo)%>%
-    rename("Job Openings {current_year}":=`Job Openings`)%>%
-    add_totals()%>%
-    fix_col_names()%>%
-    datatable()%>%
-    formatStyle(
-  'Geographic Area',
-  target = 'row',
-  backgroundColor = styleEqual(c("Aggregate"), c('lightgray'))
-)
-    
-    ,
-  rownames=FALSE
-)
-```
-
-
-
-
 
 
 `r page_titles[11]`  {data-navmenu="Table of Contents"} 

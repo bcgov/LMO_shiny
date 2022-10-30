@@ -240,20 +240,43 @@ write_csv(oot_no_noc, here::here("shiny_data","occupation_outlook_table.csv"))
 # Job openings 500 occupations (hoo is a filtered version of this)------------
 
 wages_and_interests <- wages%>%
-  left_join(interests)
+  left_join(noc_mapping)%>%
+  left_join(typical_education)%>%
+  group_by(`Typical_Education`)%>%
+  nest()%>%
+  mutate(data=map(data, get_mean_wages))%>%
+  unnest(data)%>%
+  mutate(number_noc=word(noc, 1, sep = "_"))%>%
+  left_join(interests, by=c("number_noc"="noc"))%>%
+  mutate(noc = case_when(is.na(noc) & is.na(NOC4) & is.na(NOC3) & is.na(NOC2) ~NOC1,
+                           is.na(noc) & is.na(NOC4) & is.na(NOC3) ~ NOC2,
+                           is.na(noc) & is.na(NOC4) ~ NOC3,
+                           TRUE ~ NOC4),
+           noc = word(noc, 1, sep = "_"))%>%
+  select(-number_noc)
+
 
 just_jo <- occupation_outlook_table%>%
-  filter(name=="Job Openings")
+  filter(name=="Job Openings")%>%
+  mutate(noc = case_when(is.na(noc) & is.na(NOC4) & is.na(NOC3) & is.na(NOC2) ~NOC1,
+                         is.na(noc) & is.na(NOC4) & is.na(NOC3) ~ NOC2,
+                         is.na(noc) & is.na(NOC4) ~ NOC3,
+                         TRUE ~ NOC4),
+         noc = word(noc, 1, sep = " "))
 
-jo_500 <- wages_and_interests%>%
-  left_join(just_jo, by=c("noc"="noc"),  multiple = "all")%>%
-  pivot_wider()%>%
-  full_join(whos_hoo,
+
+jo_500 <- just_jo%>%
+  left_join(wages_and_interests, by=c("noc"="noc","Typical_Education"="Typical_Education"))%>%
+  select(-ends_with(".y"))%>%
+  rename(N0C1=NOC1.x,
+         N0C2=NOC2.x,
+         N0C3=NOC3.x,
+         N0C4=NOC4.x)%>%
+  left_join(whos_hoo,
             by=c("noc"="noc",
-                 "Geographic_Area"="geographic_area"),
-            multiple = "all"
+                 "Geographic_Area"="geographic_area")
             )%>%
-  select(-noc, -description)
+  select(-noc)
 
 write_csv(jo_500, here::here("shiny_data","jo_500.csv"))
 
