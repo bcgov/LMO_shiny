@@ -55,6 +55,17 @@ whos_hoo <- read_excel(here::here("raw_data","HOO list 2022E.xlsx"))%>%
   mutate(hoo= if_else(high_opportunity_occupation=="Yes", TRUE, FALSE))%>%
   select(-high_opportunity_occupation)
 
+read_excel(here::here("raw_data","LMO-supply-composition-output-total10yr FINAL.xlsx"), skip=2)%>%
+  janitor::clean_names()%>%
+  select(-x1, -year)%>%
+  filter(noc!="#T")%>%
+  left_join(noc_mapping)%>%
+  select(-noc, -occupation_title)%>%
+  fix_col_names()%>%
+  camel_to_title()%>%
+  mutate(across(where(is.numeric), ~round(., round_medium)))%>%
+  write_csv(here::here("shiny_data","new_supply.csv"))
+
 # we need current_year ASAP, so this code is ahead of where it is used in dashboard--------
 #'jo_raw and emp_raw tibbles are wide and contain unwanted aggregates.
 #' e.g. when we are breaking down by noc we want it to be for all industries but we drop the aggregate NOC.

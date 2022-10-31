@@ -38,7 +38,9 @@ industry_outlook <- vroom::vroom(here::here("shiny_data","industry_outlook.csv")
 ds_and_jo_tab <- vroom::vroom(here::here("shiny_data","ds_and_jo_tab.csv"))
 ds_and_jo <-  vroom::vroom(here::here("shiny_data","ds_and_jo.csv"))
 regional <-  vroom::vroom(here::here("shiny_data","regional.csv"))
+new_supply <- vroom::vroom(here::here("shiny_data","new_supply.csv"))
 jo_500 <-  vroom::vroom(here::here("shiny_data","jo_500.csv"))
+definitions <- readxl::read_excel(here::here("raw_data","Definitions 2022E.xlsx"))
 hoo <- jo_500%>%
   filter(hoo!=FALSE)%>%
   select(-hoo)
@@ -939,17 +941,59 @@ nav_but(direction = "previous", current_page = 11)
 nav_but(direction = "next", current_page = 11)
 ```
 
-Row {data-height=500}
+
+### Inputs
+
+
+```{r}
+
+selectizeGroupUI(
+        id = "new_supply_filters",
+        inline = FALSE,
+        params = list(
+          var_one = list(inputId = "NOC1", title = "Choose a NOC1", placeholder = "select"),
+          var_two = list(inputId = "NOC2", title = "Choose a NOC2", placeholder = "select"),
+          var_three = list(inputId = "NOC3", title = "Choose a NOC3", placeholder = "select")
+         )
+      )
+
+new_supply_mod <- callModule(
+    module = selectizeGroupServer,
+    id = "new_supply_filters",
+    data = new_supply,
+    vars = c(
+      "NOC1",
+      "NOC2",
+      "NOC3"
+   )
+)
+
+new_supply_table <- reactive({
+  new_supply_mod()%>%
+    select(noc=NOC4, everything())%>%
+    select(-NOC1,-NOC2,-NOC3)
+})
+
+```
+
+
+Row 
 -------------------------------------
-###
+### 
 
-###
+```{r}
 
-Row {data-height=500}
--------------------------------------
-###
+DT::renderDT(
+  new_supply_table()%>%
+    fix_col_names()%>%
+    datatable(rownames=FALSE)
+)
+```
 
-###
+
+
+
+
 
 `r page_titles[12]`  {data-navmenu="Table of Contents"}
 =========================================
@@ -966,17 +1010,22 @@ nav_but(direction = "previous", current_page = 12)
 nav_but(direction = "next", current_page = 12)
 ```
 
-Row {data-height=500}
+Row 
 -------------------------------------
 ###
 
-###
-
-Row {data-height=500}
--------------------------------------
-###
+```{r}
+DT::datatable(definitions, options = list(dom="t", paging=FALSE), rownames = FALSE)
+```
 
 ###
+
+```{r}
+knitr::include_graphics("workers.jpg")
+```
+
+
+
 
 
 
