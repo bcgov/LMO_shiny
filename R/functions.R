@@ -145,55 +145,6 @@ get_mean_wages <- function(tbbl){
            NOC4=noc4)
 }
 
-bc_reg_choro2<-function(tbbl, region, thingy, value) {
-  tbbl <- tbbl%>%
-    rename(region =  {{  region  }},
-           thingy = {{  thingy  }},
-           value = {{  value  }}
-    )%>%
-    ungroup()
-
-  shape <- bc_reg_sf()
-
-  tbbl <- shape%>%
-    left_join(tbbl, multiple = "all")
-
-  variable_plotted <- tbbl$thingy[1]
-
-  pal <- colorNumeric("viridis", domain = tbbl$value)
-  pal_rev <- colorNumeric("viridis", domain = tbbl$value, reverse = TRUE)
-
-  mytext <- paste(
-    "Region: ", str_to_title(str_replace_all(tbbl$region,"_"," ")),"<br/>",
-    str_to_title(str_replace_all(variable_plotted,"_"," ")), ": ", scales::percent(tbbl$value, accuracy = .1), "<br/>",
-    sep="") %>%
-    lapply(htmltools::HTML)
-  leaflet(tbbl,
-          options = leafletOptions(
-            attributionControl = FALSE
-          )
-  ) %>%
-    setView(lng = -125, lat = 55, zoom = 5) %>%
-    addProviderTiles("Esri.NatGeoWorldMap") %>%
-    addPolygons(
-      fillColor = ~ pal(value),
-      color = "black",
-      label=mytext,
-      fillOpacity = .5,
-      weight = 1
-    )%>%
-    addLegend("topright",
-              pal = pal_rev,
-              values = ~ value,
-              labFormat = labelFormat(
-                suffix="%",
-                transform = function(x) 100*sort(x, decreasing = TRUE)),
-              title = str_to_title(str_replace_all(variable_plotted,"_"," "))
-    )
-}
-
-
-
 # # this function take a tbbl with two columns, start and finish and returns either start OR a sequence between start and finish.
 # fill_range <- function(tbbl){
 #   if(is.na(tbbl$finish)){

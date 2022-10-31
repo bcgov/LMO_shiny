@@ -44,7 +44,7 @@ hoo <- jo_500%>%
   select(-hoo)
 jo_500 <- jo_500%>%
   select(-hoo)
-#hoo <- occupation_outlook_table 
+#interests <-  na.omit(unique(trimws(unlist(str_split(jo_500$interests, ",")))))
 
 current_year <- min(ds_and_jo$date)-1
 page_titles <- c("Landing Page",
@@ -803,7 +803,8 @@ selectizeGroupUI(
           var_two = list(inputId = "Geographic_Area", title = "Choose a Geographic Area", placeholder = "select"),
           var_three = list(inputId = "NOC1", title = "Choose a NOC1", placeholder = "select"),
           var_four = list(inputId = "NOC2", title = "Choose a NOC2", placeholder = "select"),
-          var_five = list(inputId = "NOC3", title = "Choose a NOC3", placeholder = "select")
+          var_five = list(inputId = "NOC3", title = "Choose a NOC3", placeholder = "select"),
+          var_six = list(inputId = "interests", title = "Choose your Interests", placeholder = "select")
         )
       )
 
@@ -817,7 +818,8 @@ hoo_mod <- callModule(
       "Geographic_Area",
       "NOC1",
       "NOC2",
-      "NOC3"
+      "NOC3",
+      "interests"
     )
 )
 
@@ -829,7 +831,7 @@ hoo_noc <- reactive({
 
 hoo_table <- reactive({
   hoo_mod()%>%
-    distinct(Geographic_Area, Typical_Education, name, get(hoo_noc()), .keep_all = TRUE)%>%
+    distinct(Geographic_Area, Typical_Education, name, get(hoo_noc()), interests, .keep_all = TRUE)%>%
     select(noc="get(hoo_noc())", everything())%>%
     select(-NOC1,-NOC2,-NOC3,-NOC4)%>%
     pivot_wider()
@@ -879,6 +881,7 @@ nav_but(direction = "next", current_page = 10)
 
 
 ```{r}
+
 selectizeGroupUI(
         id = "jo_500_filters",
         inline = FALSE,
@@ -887,9 +890,11 @@ selectizeGroupUI(
           var_two = list(inputId = "Geographic_Area", title = "Choose a Geographic Area", placeholder = "select"),
           var_three = list(inputId = "NOC1", title = "Choose a NOC1", placeholder = "select"),
           var_four = list(inputId = "NOC2", title = "Choose a NOC2", placeholder = "select"),
-          var_five = list(inputId = "NOC3", title = "Choose a NOC3", placeholder = "select")
+          var_five = list(inputId = "NOC3", title = "Choose a NOC3", placeholder = "select"),
+          var_six = list(inputId = "interests", title = "Choose your Interests", placeholder = "select")
         )
       )
+
 
 
 jo_500_mod <- callModule(
@@ -901,26 +906,29 @@ jo_500_mod <- callModule(
       "Geographic_Area",
       "NOC1",
       "NOC2",
-      "NOC3"
+      "NOC3",
+      "interests"
     )
 )
 
 jo_500_noc <- reactive({
-  case_when(is.null(input[["jo_500_filters-NOC1"]]) &
-           is.null(input[["jo_500_filters-NOC2"]]) &
-           is.null(input[["jo_500_filters-NOC3"]]) ~ "NOC1",
-           is.null(input[["jo_500_filters-NOC2"]]) &
-           is.null(input[["jo_500_filters-NOC3"]]) ~ "NOC2",
-           is.null(input[["jo_500_filters-NOC3"]]) ~ "NOC3",
-           TRUE~"NOC4")
+  # case_when(is.null(input[["jo_500_filters-NOC1"]]) &
+  #          is.null(input[["jo_500_filters-NOC2"]]) &
+  #          is.null(input[["jo_500_filters-NOC3"]]) ~ "NOC1",
+  #          is.null(input[["jo_500_filters-NOC2"]]) &
+  #          is.null(input[["jo_500_filters-NOC3"]]) ~ "NOC2",
+  #          is.null(input[["jo_500_filters-NOC3"]]) ~ "NOC3",
+  #          TRUE~"NOC4")
+  "NOC4"
 })
 
 jo_500_table <- reactive({
   jo_500_mod()%>%
-    distinct(Geographic_Area, name, get(jo_500_noc()), .keep_all = TRUE)%>%
+    distinct(Geographic_Area, name, get(jo_500_noc()), interests, .keep_all = TRUE)%>%
     select(noc="get(jo_500_noc())", everything())%>%
     select(-NOC1,-NOC2,-NOC3,-NOC4)%>%
-    pivot_wider()
+    pivot_wider()%>%
+    na.omit()
 })
 
 ```
