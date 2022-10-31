@@ -8,12 +8,16 @@ css: style.css
 params:
   doc_title: 2022 British Columbia Labour Market Outlook
 resource_files:
+- shiny_data/jo_500.csv
+- shiny_data/occupation_outlook_table.csv
+- shiny_data/occupation_outlook.csv
+- shiny_data/industry_outlook.csv
 - shiny_data/regional.csv
 - shiny_data/ds_and_jo_tab.csv
 - shiny_data/ds_and_jo.csv
-- shiny_data/occupation_outlook.csv
+- shiny_data/new_supply.csv
+- raw_data/Definitions 2022E.xlsx
 - R/functions.R
-- raw_data/Education 2022E.xlsx
 ---
 
 ```{r}
@@ -164,7 +168,7 @@ pie <- occupation_outlook%>%
 
 #pie <- readxl::read_excel(here::here("raw_data","Education 2022E.xlsx"))
 ct <- paste(scales::comma(round(sum(pie$`Job Openings`)+1, round_large)),"Job Openings \n Expected in B.C")
-aest::aest_donut(pie, `Job Openings`, group_var = Typical_Education, center_text = ct, center_text_size = 2.5, lab_size=2.5)
+wrapR::donut(pie, `Job Openings`, group_var = Typical_Education, center_text = ct, center_text_size = 2.5, lab_size=2.5)
 ```
 
 `r page_titles[3]`  {data-navmenu="Table of Contents"}
@@ -213,7 +217,7 @@ Row {data-height=500}
 ###
 ```{r, fig.retina=2}
 renderPlot({
-  aest::aest_donut(pie_data(), value , group_var = name, center_text = ct_reactive(), center_text_size = 4, lab_size=4)
+  wrapR::donut(pie_data(), value , group_var = name, center_text = ct_reactive(), center_text_size = 4, lab_size=4)
 })
 ```
 ###
@@ -239,7 +243,7 @@ pie_dat <- ds_and_jo_tab%>%
     "Migrants From Other Provinces",
     "Additional Supply Requirement",
     "Decline Unemployment"))
-aest::aest_donut(pie_dat, value , group_var = name, center_text = ct, center_text_size = 4, lab_size=4)
+wrapR::donut(pie_dat, value , group_var = name, center_text = ct, center_text_size = 4, lab_size=4)
 ```
 
 ###
@@ -257,7 +261,7 @@ bar_dat <- ds_and_jo%>%
          ))%>%
   mutate(date=factor(date))
 
-plt <- aest::aest_parts_and_whole(bar_dat, date, value, name, "stack")+
+plt <- wrapR::parts_and_whole(bar_dat, date, value, name, "stack")+
   theme_minimal()+
   labs(x="", y="")
   
