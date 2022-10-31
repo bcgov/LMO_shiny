@@ -823,17 +823,11 @@ hoo_mod <- callModule(
     )
 )
 
-
-hoo_noc <- reactive({
-  "NOC4"
-})
-
-
 hoo_table <- reactive({
   hoo_mod()%>%
-    distinct(Geographic_Area, Typical_Education, name, get(hoo_noc()), interests, .keep_all = TRUE)%>%
-    select(noc="get(hoo_noc())", everything())%>%
-    select(-NOC1,-NOC2,-NOC3,-NOC4)%>%
+    distinct(Geographic_Area, Typical_Education, name, NOC4, interests, .keep_all = TRUE)%>%
+    select(noc=NOC4, everything())%>%
+    select(-NOC1,-NOC2,-NOC3)%>%
     pivot_wider()
 })
 
@@ -849,11 +843,7 @@ Row
 DT::renderDT(
   hoo_table()%>%
     fix_col_names()%>%
-    datatable(rownames=FALSE)%>%
-    formatStyle(
-  'NOC',
-  target = 'row',
-  backgroundColor = styleEqual(c(NA), c('lightgray')))
+    datatable(rownames=FALSE)
 )
 ```
 
@@ -895,8 +885,6 @@ selectizeGroupUI(
         )
       )
 
-
-
 jo_500_mod <- callModule(
     module = selectizeGroupServer,
     id = "jo_500_filters",
@@ -911,22 +899,11 @@ jo_500_mod <- callModule(
     )
 )
 
-jo_500_noc <- reactive({
-  # case_when(is.null(input[["jo_500_filters-NOC1"]]) &
-  #          is.null(input[["jo_500_filters-NOC2"]]) &
-  #          is.null(input[["jo_500_filters-NOC3"]]) ~ "NOC1",
-  #          is.null(input[["jo_500_filters-NOC2"]]) &
-  #          is.null(input[["jo_500_filters-NOC3"]]) ~ "NOC2",
-  #          is.null(input[["jo_500_filters-NOC3"]]) ~ "NOC3",
-  #          TRUE~"NOC4")
-  "NOC4"
-})
-
 jo_500_table <- reactive({
   jo_500_mod()%>%
-    distinct(Geographic_Area, name, get(jo_500_noc()), interests, .keep_all = TRUE)%>%
-    select(noc="get(jo_500_noc())", everything())%>%
-    select(-NOC1,-NOC2,-NOC3,-NOC4)%>%
+    distinct(Geographic_Area, name, NOC4, interests, .keep_all = TRUE)%>%
+    select(noc=NOC4, everything())%>%
+    select(-NOC1,-NOC2,-NOC3)%>%
     pivot_wider()%>%
     na.omit()
 })
@@ -943,11 +920,7 @@ Row
 DT::renderDT(
   jo_500_table()%>%
     fix_col_names()%>%
-    datatable(rownames=FALSE)%>%
-    formatStyle(
-  'NOC',
-  target = 'row',
-  backgroundColor = styleEqual(c(NA), c('lightgray')))
+    datatable(rownames=FALSE)
 )
 ```
 
