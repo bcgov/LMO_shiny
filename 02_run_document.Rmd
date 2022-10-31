@@ -325,7 +325,7 @@ Row
 ###
 ```{r}
 leaflet::renderLeaflet({
-  bc_reg_choro2(map_tbbl(), geographic_area, name, value)
+  bc_reg_choro(map_tbbl(), geographic_area, name, value)
 })
 ```
 
@@ -821,19 +821,15 @@ hoo_mod <- callModule(
     )
 )
 
+
 hoo_noc <- reactive({
-  case_when(is.null(input[["hoo_filters-NOC1"]]) &
-           is.null(input[["hoo_filters-NOC2"]]) &
-           is.null(input[["hoo_filters-NOC3"]]) ~ "NOC1",
-           is.null(input[["hoo_filters-NOC2"]]) &
-           is.null(input[["hoo_filters-NOC3"]]) ~ "NOC2",
-           is.null(input[["hoo_filters-NOC3"]]) ~ "NOC3",
-           TRUE~"NOC4")
+  "NOC4"
 })
+
 
 hoo_table <- reactive({
   hoo_mod()%>%
-    distinct(Geographic_Area, name, get(hoo_noc()), .keep_all = TRUE)%>%
+    distinct(Geographic_Area, Typical_Education, name, get(hoo_noc()), .keep_all = TRUE)%>%
     select(noc="get(hoo_noc())", everything())%>%
     select(-NOC1,-NOC2,-NOC3,-NOC4)%>%
     pivot_wider()
@@ -912,7 +908,7 @@ jo_500_mod <- callModule(
 jo_500_noc <- reactive({
   case_when(is.null(input[["jo_500_filters-NOC1"]]) &
            is.null(input[["jo_500_filters-NOC2"]]) &
-           is.null(input[["jo_500_filters-NOC3"]]) ~ "NOC4",
+           is.null(input[["jo_500_filters-NOC3"]]) ~ "NOC1",
            is.null(input[["jo_500_filters-NOC2"]]) &
            is.null(input[["jo_500_filters-NOC3"]]) ~ "NOC2",
            is.null(input[["jo_500_filters-NOC3"]]) ~ "NOC3",
