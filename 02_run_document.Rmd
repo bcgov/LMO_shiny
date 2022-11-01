@@ -50,7 +50,6 @@ hoo <- jo_500%>%
   select(-hoo)
 jo_500 <- jo_500%>%
   select(-hoo)
-#interests <-  na.omit(unique(trimws(unlist(str_split(jo_500$interests, ",")))))
 
 current_year <- min(ds_and_jo$date)-1
 page_titles <- c("Landing Page",
@@ -723,6 +722,7 @@ selectizeGroupUI(
       )
 
 occupation_outlook_table <- occupation_outlook_table%>%
+  select(-noc)%>%
   filter(name %in% c("Employment Level","Expansion Demand","Replacement Demand","Job Openings", "Job Openings As Share Of Employment"))%>%
   pivot_wider()%>%
   rename("Job Openings {current_year+1}-{current_year+10}" := `Job Openings`,

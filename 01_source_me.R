@@ -7,7 +7,7 @@ library("here")
 library("readxl")
 library("readr")
 library("stringr")
-library("wrapR")
+library("wrapR") #  devtools::install_github("bcgov/wrapR")
 #constants------------
 round_small <- 2 #round to 2 digits
 round_medium <- -1 #round to nearest 10
@@ -33,6 +33,13 @@ ds_raw <- vroom::vroom(here("raw_data",
                    skip=3,
                    col_select = -1)
 
+
+noc_mapping <- vroom::vroom(here::here("raw_data","noc_mapping.csv"))
+
+industry_mapping <- vroom::vroom(here::here("raw_data","industry_to_agg_mapping.csv"), delim=",")%>%
+  distinct()
+
+
 typical_education <- read_excel(here::here("raw_data","Occupational Characteristics based on LMO 2022E 2022-Aug.xlsx"), skip=3, sheet = "Characteristics")%>%
   janitor::clean_names()%>%
   select(noc=noc_2016, Typical_Education=typical_education_background_2022_editon)
@@ -52,7 +59,7 @@ interests <- read_excel(here::here("raw_data","Occupational Characteristics base
 
 whos_hoo <- read_excel(here::here("raw_data","HOO list 2022E.xlsx"))%>%
   janitor::clean_names()%>%
-  mutate(hoo= if_else(high_opportunity_occupation=="Yes", TRUE, FALSE))%>%
+  mutate(hoo = if_else(high_opportunity_occupation=="Yes", TRUE, FALSE))%>%
   select(-high_opportunity_occupation)
 
 read_excel(here::here("raw_data","LMO-supply-composition-output-total10yr FINAL.xlsx"), skip=2)%>%
@@ -64,12 +71,13 @@ read_excel(here::here("raw_data","LMO-supply-composition-output-total10yr FINAL.
   fix_col_names()%>%
   camel_to_title()%>%
   mutate(across(where(is.numeric), ~round(., round_medium)))%>%
-  write_csv(here::here("shiny_data","new_supply.csv"))
+  write_csv(here::here("shiny_data","new_supply.csv")) #for new supply table
 
 # we need current_year ASAP, so this code is ahead of where it is used in dashboard--------
+
 #'jo_raw and emp_raw tibbles are wide and contain unwanted aggregates.
-#' e.g. when we are breaking down by noc we want it to be for all industries but we drop the aggregate NOC.
-#' when we are breaking down by industry we want it to be for all NOC, but we drop the all industry aggregate.
+#' e.g. when we are breaking down by noc we want it to be for all industries and drop the aggregate NOC.
+#' when we are breaking down by industry we want it to be for all NOC, and drop the all industry aggregate.
 
 long_by_noc <- bind_long_by(jo_raw, employment_raw, "noc")%>%
   select(-industry)
@@ -79,6 +87,7 @@ long_by_industry <- bind_long_by(jo_raw, employment_raw, "industry")%>%
 current_year <- min(long_by_noc$date)
 
 # #ds_and_jo----------------
+#' Highlights page 1 and Annual outlook are based on all_industry, all_NOC aggregates.
 
 jo_total_noc <- jo_raw%>%
   filter(Industry=="All industries",
@@ -102,7 +111,7 @@ ds_total_noc <- ds_raw%>%
   clean_tbbl()%>%
   mutate(date=as.numeric(as.character(date)))%>%
   filter(date>current_year,
-         noc=="#t",
+         noc=="#t", #ds_raw contains ONLY the "all_industry" aggregate so no need to filter out industries
          variable %in% c("deaths",
                          "retirements",
                          "new_entrants",
@@ -125,7 +134,9 @@ ds_and_jo <- bind_rows(jo_total_noc, ds_total_noc)%>%
 
 ds_and_jo%>%
   camel_to_title()%>%
-  write_csv(here::here("shiny_data","ds_and_jo.csv"))
+  write_csv(here::here("shiny_data","ds_and_jo.csv")) #annual outlook page: everything except bottom left donut.
+
+#Highlights Part 1 and annual outlook page (bottom left donut)------------------
 
 jo_total <- jo_total_noc%>%
   filter(geographic_area=="british_columbia",
@@ -159,9 +170,10 @@ ds_tab <- ds_and_jo%>%
   )
 
 bind_rows(jo_tab, ds_tab)%>%
-  write_csv(here::here("shiny_data","ds_and_jo_tab.csv"))
+  write_csv(here::here("shiny_data","ds_and_jo_tab.csv")) #Highlights Part 1 and annual outlook page (bottom left donut)
 
 #regional page------------
+#' Highlights page 1 and Annual outlook are based on all_industry, all_NOC aggregates.
 
 emp_total_noc <- employment_raw%>%
   filter(Industry=="All industries",
@@ -193,11 +205,10 @@ regional <- jo_total_noc%>%
   select(-population)%>%
   pivot_longer(cols=-geographic_area)
 
-write_csv(regional, here::here("shiny_data","regional.csv"))
+write_csv(regional, here::here("shiny_data","regional.csv"))#for regional page
 
-#industry outlook-------------
-industry_mapping <- vroom::vroom(here::here("raw_data","industry_to_agg_mapping.csv"), delim=",")%>%
-  distinct()
+# industry outlook-------------
+#' breakdown for aggregate_industry and industry, for aggregate NOC (NOC="#T")
 
 long_and_industry_mapping <- long_by_industry%>%
   full_join(industry_mapping)
@@ -211,10 +222,10 @@ by_industry <- group_nest_agg(long_and_industry_mapping, industry)%>%
 industry_outlook <- bind_rows(by_aggregate, by_industry)%>%
   get_measures()
 
-write_csv(industry_outlook, here::here("shiny_data","industry_outlook.csv"))
+write_csv(industry_outlook, here::here("shiny_data","industry_outlook.csv")) #for industry outlook plot and table
 
 #occupation outlook plot-----------------
-noc_mapping <- vroom::vroom(here::here("raw_data","noc_mapping.csv"))
+#breakdown for NOC1, NOC2, NOC3, for aggregate industry (industry="all_industries)
 
 long_and_noc_mapping <- long_by_noc%>%
   full_join(noc_mapping)
@@ -228,12 +239,12 @@ occupation_outlook <- occupation_outlook_no_ed%>%
   left_join(typical_education)%>%
   select(-noc)
 
-write_csv(occupation_outlook, here::here("shiny_data","occupation_outlook.csv"))
+write_csv(occupation_outlook, here::here("shiny_data","occupation_outlook.csv")) #for occupation outlook plot and highlights part 1 pie.
 
 #occupation outlook table------------------------
 #' this was tricky... typical education only provided at 4 digit level... So we partition the data by typical
-#' education and then do the aggregation by noc for each of the typical education levels.
-
+#' education and then do the aggregation NOC1,NOC2,NOC3 for each of the typical education levels (again for aggregate industry).
+#' also input to JO_500 and HOO.
 
 occupation_outlook_table <- long_and_noc_mapping%>%
   left_join(typical_education)%>%
@@ -242,12 +253,9 @@ occupation_outlook_table <- long_and_noc_mapping%>%
   mutate(data=map(data, aggregate_by_noc))%>%
   unnest(data)
 
-oot_no_noc <- occupation_outlook_table%>%
-  select(-noc)
+write_csv(occupation_outlook_table, here::here("shiny_data","occupation_outlook_table.csv"))#for occupation outlook table
 
-write_csv(oot_no_noc, here::here("shiny_data","occupation_outlook_table.csv"))
-
-# Job openings 500 occupations------------
+# Job openings 500 occupations and HOO------------
 
 wages_and_interests <- wages%>%
   left_join(noc_mapping)%>%
@@ -288,7 +296,7 @@ jo_500 <- just_jo%>%
             )%>%
   select(-noc)
 
-write_csv(jo_500, here::here("shiny_data","jo_500.csv"))
+write_csv(jo_500, here::here("shiny_data","jo_500.csv")) #for jo_500 and HOO tables
 
 tictoc::toc()
 
