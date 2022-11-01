@@ -62,7 +62,7 @@ whos_hoo <- read_excel(here::here("raw_data","HOO list 2022E.xlsx"))%>%
   mutate(hoo = if_else(high_opportunity_occupation=="Yes", TRUE, FALSE))%>%
   select(-high_opportunity_occupation)
 
-read_excel(here::here("raw_data","LMO-supply-composition-output-total10yr FINAL.xlsx"), skip=2)%>%
+new_supply <- read_excel(here::here("raw_data","LMO-supply-composition-output-total10yr FINAL.xlsx"), skip=2)%>%
   janitor::clean_names()%>%
   select(-x1, -year)%>%
   filter(noc!="#T")%>%
@@ -71,6 +71,9 @@ read_excel(here::here("raw_data","LMO-supply-composition-output-total10yr FINAL.
   fix_col_names()%>%
   camel_to_title()%>%
   mutate(across(where(is.numeric), ~round(., round_medium)))%>%
+  select(-`Decline In Unemployment`)
+
+new_supply%>%
   write_csv(here::here("shiny_data","new_supply.csv")) #for new supply table
 
 # we need current_year ASAP, so this code is ahead of where it is used in dashboard--------
@@ -169,7 +172,9 @@ ds_tab <- ds_and_jo%>%
          name=str_to_title(str_replace_all(name,"_"," "))
   )
 
-bind_rows(jo_tab, ds_tab)%>%
+ds_and_jo_tab <- bind_rows(jo_tab, ds_tab)
+
+ds_and_jo_tab%>%
   write_csv(here::here("shiny_data","ds_and_jo_tab.csv")) #Highlights Part 1 and annual outlook page (bottom left donut)
 
 #regional page------------
@@ -297,6 +302,13 @@ jo_500 <- just_jo%>%
   select(-noc)
 
 write_csv(jo_500, here::here("shiny_data","jo_500.csv")) #for jo_500 and HOO tables
+
+# document objects for 03_knit_me.Rmd----------
+
+df_names = ls()[sapply(ls(), function(x) any(is.data.frame(get(x))))]
+dfs <- tibble::tibble(df_names)%>%
+  mutate(info = map(df_names, col_names_type_example))
+saveRDS(dfs, "dataframes.RDS")
 
 tictoc::toc()
 
