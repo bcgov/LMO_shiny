@@ -26,9 +26,10 @@ library(tidyverse)
 library(shinyWidgets)
 library(plotly)
 library(kableExtra)
-library(wrapR)
+library(wrapR) #  devtools::install_github("bcgov/wrapR")
 library(leaflet)
 library(DT)
+library(here)
 #constants------------
 round_small <- 2 #round to 2 digits
 round_medium <- -1 #round to nearest 10
@@ -158,16 +159,9 @@ gsub("<thead>.*</thead>", "", tbbl)
 ### Job Openings by Education Level   
 
 ```{r, fig.retina=2}
-pie <- occupation_outlook%>%
-  filter(Geographic_Area=="British Columbia",
-         name=="Job Openings",
-         !is.na(NOC4))%>%
-  group_by(Typical_Education)%>%
-  summarize(`Job Openings`=sum(value))
-
-#pie <- readxl::read_excel(here::here("raw_data","Education 2022E.xlsx"))
-ct <- paste(scales::comma(round(sum(pie$`Job Openings`)+1, round_large)),"Job Openings \n Expected in B.C")
-wrapR::donut(pie, `Job Openings`, group_var = Typical_Education, center_text = ct, center_text_size = 2.5, lab_size=2.5)
+jo_by_ed <- read_csv(here("shiny_data","jo_by_ed.csv"))
+ct <- paste(scales::comma(round(sum(jo_by_ed$`Job Openings`)+1, round_large)),"Job Openings \n Expected in B.C")
+wrapR::donut(jo_by_ed, `Job Openings`, group_var = Typical_Education, center_text = ct, center_text_size = 2.5, lab_size=2.5)
 ```
 
 `r page_titles[3]`  {data-navmenu="Table of Contents"}
@@ -330,7 +324,7 @@ Row
 ###
 ```{r}
 leaflet::renderLeaflet({
-  bc_reg_choro(map_tbbl(), geographic_area, name, value)
+  bc_reg_choro(map_tbbl(), geographic_area, name, value, "percent")
 })
 ```
 

@@ -8,6 +8,7 @@ library("readxl")
 library("readr")
 library("stringr")
 library("wrapR") #  devtools::install_github("bcgov/wrapR")
+library("janitor")
 #constants------------
 round_small <- 2 #round to 2 digits
 round_medium <- -1 #round to nearest 10
@@ -15,8 +16,14 @@ round_large <- -3 #round to nearest 1000
 # Functions------------------
 source(here::here("R","functions.R"))
 #read in dataframes--------------
+ed_back <- read_excel(here("raw_data","!! LMO 2022 Edition Job openings by education type shares.xlsx"),range = "A4:K505")%>%
+  clean_names()%>%
+  filter(noc!="#T")%>%
+  select(-starts_with("paste"), -starts_with("noc_2016"), -description)
+
+
 jo_raw <- vroom::vroom(here("raw_data",
-                            list.files(here("raw_data"), pattern = "JO", ignore.case = TRUE)),
+                            list.files(here("raw_data"), pattern = "JO", ignore.case = FALSE)),
                        locale = readr::locale(encoding = "latin1"),
                        skip=3,
                        col_select = -1)
@@ -38,7 +45,6 @@ noc_mapping <- vroom::vroom(here::here("raw_data","noc_mapping.csv"))
 
 industry_mapping <- vroom::vroom(here::here("raw_data","industry_to_agg_mapping.csv"), delim=",")%>%
   distinct()
-
 
 typical_education <- read_excel(here::here("raw_data","Occupational Characteristics based on LMO 2022E 2022-Aug.xlsx"), skip=3, sheet = "Characteristics")%>%
   janitor::clean_names()%>%
@@ -89,6 +95,43 @@ long_by_industry <- bind_long_by(jo_raw, employment_raw, "industry")%>%
 
 current_year <- min(long_by_noc$date)
 
+#for the job openings by education pie chart--------------------
+
+jo_by_ed <- jo_raw%>%
+  filter(Variable == "Job Openings",
+         `Geographic Area` == "British Columbia",
+         Industry == "All industries",
+         NOC != "#T")%>%
+  select(-Variable, -`Geographic Area`, -Industry)%>%
+  pivot_longer(cols=-c(NOC,Description), names_to = "year")%>%
+  filter(year>min(year))%>%
+  clean_names()%>%
+  group_by(noc, description)%>%
+  summarize(value=sum(value))%>%
+  full_join(ed_back)%>%
+  mutate(across(c(no_certificate_diploma_or_degree,
+                  secondary_high_school_diploma_or_equivalency_certificate,
+                  postsecondary_certificate_or_diploma_below_bachelor_level,
+                  apprenticeship_certificate,
+                  diploma_certificate_excluding_apprenticeship,
+                  university_certificate_diploma_or_degree_at_bachelor_level_or_above), ~ .x*value))%>%
+  adorn_totals()%>%
+  select(-contains("below"))%>%
+  filter(noc=="Total")%>%
+  ungroup()%>%
+  select(-noc, -description,-value)%>%
+  pivot_longer(cols=everything())%>%
+  mutate(value=round(value,-2))%>%
+  rename(`Job Openings`=value,
+         Typical_Education=name)%>%
+  wrapR::camel_to_title()%>%
+  mutate(Typical_Education=str_replace(Typical_Education, "No Certificate Diploma Or Degree", "Less than high school"),
+         Typical_Education=str_replace(Typical_Education, "Secondary High School Diploma Or Equivalency Certificate", "High school and/or occupation specific training"),
+         Typical_Education=str_replace(Typical_Education, "University Certificate Diploma Or Degree At Bachelor Level Or Above", "Bachelor's, graduate or professional degree")
+         )
+
+write_csv(jo_by_ed, here("shiny_data","jo_by_ed.csv"))
+
 # #ds_and_jo----------------
 #' Highlights page 1 and Annual outlook are based on all_industry, all_NOC aggregates.
 
@@ -118,12 +161,12 @@ ds_total_noc <- ds_raw%>%
          variable %in% c("deaths",
                          "retirements",
                          "new_entrants",
-                         "net_international_in-migration",
-                         "net_interregional_in-migration"))%>%
+                         "net_international_in_migration",
+                         "net_interregional_in_migration"))%>%
   pivot_wider(names_from = variable, values_from = value)%>%
   rename(young_people_starting_work=new_entrants,
-         immigrants=`net_international_in-migration`,
-         migrants_from_other_provinces=`net_interregional_in-migration`)%>%
+         immigrants=`net_international_in_migration`,
+         migrants_from_other_provinces=`net_interregional_in_migration`)%>%
   select(-noc, -description, -industry)%>%
   pivot_longer(cols=-c(date, geographic_area))
 
@@ -219,10 +262,12 @@ long_and_industry_mapping <- long_by_industry%>%
   full_join(industry_mapping)
 
 by_aggregate <- group_nest_agg(long_and_industry_mapping, aggregate_industry)%>%
+  na.omit()%>%
   mutate(industry=NA)
 
 by_industry <- group_nest_agg(long_and_industry_mapping, industry)%>%
-  left_join(industry_mapping, multiple = "all")
+  left_join(industry_mapping, multiple = "all")%>%
+  na.omit()
 
 industry_outlook <- bind_rows(by_aggregate, by_industry)%>%
   get_measures()

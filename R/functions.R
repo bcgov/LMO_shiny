@@ -144,3 +144,21 @@ get_mean_wages <- function(tbbl){
            NOC3=noc3,
            NOC4=noc4)
 }
+get_ten_obs <- function(vec){
+  if_else(is.factor(vec) | is.character(vec),
+          paste(head(unique(vec), n=10), collapse = ", "),
+          paste(sample(vec, size=10, replace=TRUE), collapse = ", "))
+}
+
+get_levels <- function(vec){
+  length(unique(vec))
+}
+
+# creates summary of a dataframe (columns and column types)
+col_names_type_example <- function(df){
+  cname <- colnames(get(df))
+  ctype <- sapply(get(df), class)
+  clevels <- sapply(get(df), get_levels)
+  cexample <- sapply(get(df), get_ten_obs)
+  tbbl <- tibble::tibble(column = cname, type = ctype, levels= clevels, ten_values = cexample)
+}
