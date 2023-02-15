@@ -1,0 +1,71 @@
+---
+title: "Summary of data processing"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(htmltools)
+dfs <- readRDS("dataframes.RDS")
+```
+
+
+### Input Dataframes:
+
+Here is a brief description of the input dataframes (column names, data type, number of unique values and 10 example values).
+
+
+```{r, echo=FALSE, results='asis'}
+print_kable <- function(names, tbbl){
+  cat(HTML(paste0("<h6> Input ",names,"</h6>")))
+  tbbl%>%
+    knitr::kable(escape = TRUE)%>%
+    kableExtra::kable_styling("striped", position = "left", font_size = 7, full_width=FALSE)%>%
+    print()
+}
+
+input_list <- dfs%>%
+  filter(df_names %in% c("jo_raw",
+                         "employment_raw",
+                         "ds_raw",
+                         "noc_mapping",
+                         "industry_mapping",
+                         "typical_education",
+                         "wages",
+                         "interests",
+                         "new_supply"))%>%
+  deframe()
+
+walk2(names(input_list), input_list, print_kable)
+```
+
+
+### Output dataframe summaries:
+
+Here is a brief description of the output dataframes (column names, data type, number of unique values and 10 example values.)
+
+
+```{r, echo=FALSE, results='asis'}
+print_kable <- function(names, tbbl){
+  cat(HTML(paste0("<h6> Output ",names,"</h6>")))
+  tbbl%>%
+    knitr::kable(escape = TRUE)%>%
+    kableExtra::kable_styling("striped", position = "left", font_size = 7, full_width=FALSE)%>%
+    print()
+}
+
+out_list <- dfs%>%
+  filter(df_names %in% c("ds_and_jo",
+                         "ds_and_jo_tab",
+                         "regional",
+                         "industry_outlook",
+                         "occupation_outlook",
+                         "occupation_outlook_table",
+                         "jo_500"))%>%
+  deframe()
+
+walk2(names(out_list), out_list, print_kable)
+```
+
+

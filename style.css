@@ -1,0 +1,45 @@
+.navbar-inverse {
+  background-color: #1f4181;
+  border-color: #1f4181;
+}
+.navbar-inverse .navbar-nav > .active > a, .navbar-inverse .navbar-nav > .active > a:hover, .navbar-inverse .navbar-nav > .active > a:focus {
+  color: #fabc29;
+  background-color: #1f4181;
+}
+.btn-primary {
+  color: #fabc29;
+  background-color: #1f4181;
+  border-color: #1f4181;
+}
+
+.dropdown-menu>.active>a, .dropdown-menu>.active>a:hover, .dropdown-menu>.active>a:focus {
+    color: #fabc29;
+    text-decoration: none;
+    outline: 0;
+    background-color: #1f4181;
+}
+.dropdown-menu>li>a:hover, .dropdown-menu>li>a:focus {
+    text-decoration: none;
+    color: #ffffff;
+    background-color: #1f4181;
+}
+.btn-primary:focus, .btn-primary.focus {
+    color: #ffffff;
+    background-color: #1f4181;
+    border-color: #1f4181;
+}
+
+.center {
+  text-align: center;
+}
+
+th, td {
+  padding: 15px;
+}
+.myFormat {
+  font-size: 30px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+
